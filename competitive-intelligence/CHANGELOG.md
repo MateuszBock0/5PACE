@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-rc1 synchronisation hotfix
+
+- Ignore unchecked Space industry checkbox-only template rows in Observations and Main; retain all real records and strict ID checks.
+- Read worksheets in small batches, show progress, retry temporary network/HTTP errors, and default to a 120-second read timeout. Store only after the complete dataset passes validation.
+
 ## 1.0.0-rc1
 
 - Complete integrated roadmap through strategic intelligence, with explicit bounds and evidence limitations.

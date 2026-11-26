@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from pathlib import Path
 from urllib.parse import quote
 from filelock import FileLock, Timeout
@@ -45,25 +46,45 @@ def download(cfg):
     timeout=float(cfg["request_timeout_seconds"])
     base="https://sheets.googleapis.com/v4/spreadsheets/"+quote(sid,safe="")
     with AuthorizedSession(credentials()) as session:
-        def get(url,params):
-            response=session.get(url,params=params,timeout=timeout)
-            response.raise_for_status()
-            return response.json()
-        meta=get(base,{"fields":"sheets(properties(title,gridProperties)" + ")"})
+        from requests.exceptions import Timeout as RequestTimeout, ConnectionError
+        def get(url,params,label):
+            for attempt in range(3):
+                try:
+                    response=session.get(url,params=params,timeout=(min(timeout,10),timeout))
+                    if response.status_code in (429,500,502,503,504) and attempt<2:
+                        print(f"{label}: temporary HTTP {response.status_code}; retrying",flush=True)
+                    else:
+                        response.raise_for_status()
+                        return response.json()
+                except (RequestTimeout,ConnectionError):
+                    if attempt==2:
+                        raise ValueError(f"{label}: network timeout or connection failure after 3 attempts") from None
+                    print(f"{label}: temporary network failure; retrying",flush=True)
+                time.sleep(2**attempt)
+            raise ValueError(f"{label}: retry limit reached")
+        meta=get(base,{"fields":"sheets(properties(title,gridProperties))"},"Workbook metadata")
         tabs=[s["properties"]["title"] for s in meta["sheets"]]
         if not set(TABLES).issubset(tabs):
             raise ValueError("Missing required worksheets")
-        params=[("ranges","'"+t.replace("'","''")+"'") for t in tabs]
-        params += [("valueRenderOption","FORMATTED_VALUE"),("majorDimension","ROWS")]
-        raw=get(base+"/values:batchGet",params)
-        results=raw["valueRanges"]
-        if len(results)!=len(tabs):
-            raise ValueError("Incomplete batch response")
-        for t,v in zip(tabs,results):
-            returned=v.get("range","").split("!",1)[0].strip("'").replace("''","'")
-            if returned!=t:
-                raise ValueError("Batch response worksheet mismatch")
-        return {t:normalize_sheet(t,v.get("values",[])) for t,v in zip(tabs,results)}
+        data={}
+        for start in range(0,len(tabs),4):
+            group=tabs[start:start+4]
+            label=f"Worksheets {start+1}-{start+len(group)}/{len(tabs)}"
+            print(label+": "+", ".join(group),flush=True)
+            params=[("ranges","'"+t.replace("'","''")+"'") for t in group]
+            params += [("valueRenderOption","FORMATTED_VALUE"),("majorDimension","ROWS")]
+            raw=get(base+"/values:batchGet",params,label)
+            results=raw["valueRanges"]
+            if len(results)!=len(group):
+                raise ValueError(label+": incomplete batch response")
+            for t,v in zip(group,results):
+                returned=v.get("range","").split("!",1)[0].strip("'").replace("''","'")
+                if returned!=t:
+                    raise ValueError(label+": batch response worksheet mismatch")
+                data[t]=normalize_sheet(t,v.get("values",[]))
+                print(f"  {t}: {len(data[t]['rows'])} imported rows",flush=True)
+        print("Validating complete downloaded dataset...",flush=True)
+        return data
 
 def run(force=False):
     DATA.mkdir(parents=True,exist_ok=True)

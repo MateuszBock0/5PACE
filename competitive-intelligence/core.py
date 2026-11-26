@@ -73,7 +73,20 @@ def normalize_sheet(name, values):
             if any(len(row)>4 and row[4] not in ("",None) for row in values[1:]):
                 raise ValueError("System-function separator column is not empty")
             values = [["Function ID","Functionality","Consolidated Capability ID","Comparison criterion IDs","__separator__","Capability ID","Consolidated Functionality"]+list(values[0][7:])] + list(values[1:])
-    return normalize(values)
+    table=normalize(values)
+    if name in ("Observations","Main") and "Space industry" in table["headers"]:
+        # Google Sheets checkbox defaults occupy otherwise blank grid rows.
+        # Only discard a row when the unchecked checkbox is its sole content.
+        # A real observation with a false checkbox or a missing ID is retained.
+        table["rows"]=[
+            r for r in table["rows"]
+            if not (
+                (r.get("Space industry") is False or
+                 (isinstance(r.get("Space industry"),str) and r["Space industry"].strip().upper()=="FALSE"))
+                and all(v in ("",None) for k,v in r.items() if k!="Space industry")
+            )
+        ]
+    return table
 
 def records(data, name):
     return data[name]["rows"]

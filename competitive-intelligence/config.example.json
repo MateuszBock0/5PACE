@@ -1,7 +1,7 @@
 {
   "spreadsheet_id": "",
   "refresh_interval_hours": 24,
-  "request_timeout_seconds": 20,
+  "request_timeout_seconds": 120,
   "priority_capabilities": [],
   "vista_capabilities": {},
   "function_mapping": {},

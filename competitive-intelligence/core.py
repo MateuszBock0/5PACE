@@ -64,6 +64,17 @@ def normalize(values):
         rows.append(dict(zip(h, (list(raw) + [None]*len(h))[:len(h)])))
     return {"headers": h, "rows": rows}
 
+def normalize_sheet(name, values):
+    """Preserve the two side-by-side tables in the system-functions worksheet."""
+    if name == "AIT-VISTA System Functions" and values:
+        expected = ["Function ID", "Functionality", "Consolidated Capability ID", "Comparison criterion IDs", "", "Capability ID", "Functionality"]
+        actual = [str(v or "").strip() for v in values[0][:7]]
+        if actual == expected:
+            if any(len(row)>4 and row[4] not in ("",None) for row in values[1:]):
+                raise ValueError("System-function separator column is not empty")
+            values = [["Function ID","Functionality","Consolidated Capability ID","Comparison criterion IDs","__separator__","Capability ID","Consolidated Functionality"]+list(values[0][7:])] + list(values[1:])
+    return normalize(values)
+
 def records(data, name):
     return data[name]["rows"]
 
@@ -144,6 +155,10 @@ def validate(data, previous=None):
     for t in ("Companies","Products","Capabilities","Capability Assessment","Observations"):
         if not records(data,t):
             errors.append(f"{t}: empty critical table")
+    # The source may expose an optional, separately governed AIT-VISTA mapping.
+    if "AIT-VISTA Capabilities" in data or "AIT-VISTA System Functions" in data:
+        from product_intelligence import validate_mapping
+        errors.extend(validate_mapping(data))
     if previous:
         for name, field in IDS.items():
             if name == "Main":  # derived current view, not immutable history
@@ -206,7 +221,8 @@ def store(conn,data,source="Google Sheets",mark_synced=True):
     if errors:
         raise ValueError("; ".join(errors[:20]))
     h=digest(data)
-    conn.execute("INSERT OR IGNORE INTO snapshots VALUES (?,?,?,?,?)",(h,utcnow(),source,SCHEMA_VERSION,gzip.compress(canonical(data))))
+    captured=utcnow()
+    conn.execute("INSERT OR IGNORE INTO snapshots VALUES (?,?,?,?,?)",(h,captured,source,SCHEMA_VERSION,gzip.compress(canonical(data))))
     set_state(conn,"current_hash",h)
     set_state(conn,"latest_hash",h)
     if mark_synced:

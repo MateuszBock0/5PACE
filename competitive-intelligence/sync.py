@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 from filelock import FileLock, Timeout
-from core import ROOT, DATA, TABLES, config, connect, due, log, normalize, state, store
+from core import ROOT, DATA, TABLES, config, connect, due, log, normalize_sheet, state, store
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 TOKEN = ROOT / "credentials" / "token.json"
 CLIENT = ROOT / "credentials" / "client_secret.json"
@@ -54,7 +54,11 @@ def download(cfg):
         results=raw["valueRanges"]
         if len(results)!=len(tabs):
             raise ValueError("Incomplete batch response")
-        return {t:normalize(v.get("values",[])) for t,v in zip(tabs,results)}
+        for t,v in zip(tabs,results):
+            returned=v.get("range","").split("!",1)[0].strip("'").replace("''","'")
+            if returned!=t:
+                raise ValueError("Batch response worksheet mismatch")
+        return {t:normalize_sheet(t,v.get("values",[])) for t,v in zip(tabs,results)}
 
 def run(force=False):
     DATA.mkdir(parents=True,exist_ok=True)

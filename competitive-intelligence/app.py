@@ -15,10 +15,11 @@ from core import ROOT, config, connect, read_snapshot, history, state, restore, 
 from analytics import (frame, current_assessments, active_capabilities, matrix, coverage, score_bounds,
                        sensitivity, research_gaps, similarity, clusters, graph, capability_gaps, DISPLAY)
 from demo import fixture
+from advanced_ui import (commercial_page, product_page, strategic_page, evolution_panel, research_panel, import_panel)
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.title("5PACE | Competitive Intelligence Engine")
-st.caption("Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.0.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -44,8 +45,8 @@ if st.sidebar.button("Refresh interface"):
 if st.sidebar.button("Sync data now",disabled=demo_mode):
     subprocess.Popen([sys.executable,str(ROOT/"sync.py"),"--force"],cwd=str(ROOT))
     st.sidebar.info("Sync started in a separate process. Refresh interface to inspect its result.")
-PAGES=["Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Reports","Synchronisation"]
-page=st.sidebar.radio("Workspace",PAGES,index=0 if data is not None else 11)
+PAGES=["Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]
+page=st.sidebar.radio("Workspace",PAGES,index=0 if data is not None else len(PAGES)-1)
 
 def show(df, key=None):
     st.dataframe(df,use_container_width=True,hide_index=True)
@@ -71,6 +72,7 @@ if page=="Synchronisation":
             tmp.write_text(json.dumps(cfg,indent=2),encoding="utf-8"); tmp.replace(p)
             st.success("Local settings saved.")
     st.caption("For first authorisation, follow README.md and run AUTHORISE_WINDOWS.bat. Then run SYNC_NOW.bat.")
+    import_panel(st,demo_mode)
     st.subheader("Synchronisation log")
     show(pd.DataFrame(logs,columns=["UTC","Status","Detail"]))
     if data is not None:
@@ -189,6 +191,7 @@ elif page=="Landscape & threats":
             ss=sensitivity(mat[target],weights).merge(s[["Product ID","Product"]],on="Product ID",how="left")
             show(ss,"sensitivity")
         st.caption("Commercial threat judgement additionally requires comparable customer adoption, market fit and price evidence. The application does not invent those scores.")
+    commercial_page(st,data,mat,cnames,cfg,show)
 elif page=="Knowledge graph":
     st.header("Knowledge graph")
     ids=st.multiselect("Products",selected_products,default=selected_products[:min(5,len(selected_products))],format_func=pnames.get)
@@ -219,6 +222,7 @@ elif page=="Research gaps":
     if statuses: gaps=gaps[gaps["Status"].isin(statuses)]
     show(gaps,"research_gaps")
     st.caption("Heuristic priorities: product priority + direct competition + selected capability + disputed evidence. Review relevance before assigning research; not all combinations are applicable.")
+    research_panel(st,data,cfg,show)
     st.subheader("Existing open questions")
     show(frame(data,"To be Confirmed"),"existing_questions")
 elif page=="Similarity & clustering":
@@ -260,6 +264,7 @@ elif page=="History & evolution":
                 before,after=read_snapshot(conn,old),read_snapshot(conn,new)
             show(pd.DataFrame(diff(before,after),columns=["Table","ID","Change","Fields"]),"snapshot_changes")
             st.caption("A new assessment is new recorded knowledge, not necessarily a newly introduced product capability.")
+            evolution_panel(st,before,after,selected_caps,cnames,show)
         if snapshots:
             rows=[]
             with connect() as conn:
@@ -279,6 +284,10 @@ elif page=="History & evolution":
             dates=pd.to_datetime(obs[field],errors="coerce",utc=True)
             counts=dates.dropna().dt.strftime("%Y-%m-%d").value_counts().sort_index().rename_axis("Date").reset_index(name="Count")
             if not counts.empty: st.plotly_chart(px.bar(counts,x="Date",y="Count",title=field),use_container_width=True)
+elif page=="Product intelligence":
+    product_page(st,data,mat,pnames,cnames,cfg,show,demo_mode)
+elif page=="Strategic intelligence":
+    strategic_page(st,data,mat,cnames,cfg,show,demo_mode)
 elif page=="Reports":
     st.header("Export and reporting")
     st.caption("Exports contain local intelligence. Do not commit reports or snapshots into a public repository.")
@@ -292,4 +301,6 @@ elif page=="Reports":
     doc+="<h2>Top research questions</h2>"+gaps.head(100).to_html(index=False,escape=True)
     doc+="<p>Unknown is not unsupported. Vendor claims are not independent verification. Research priorities are heuristic.</p></body></html>"
     st.download_button("Download standalone HTML report",doc.encode("utf-8"),file_name="cie_report.html",mime="text/html")
+    from advanced_ui import strategic_report
+    st.download_button("Download strategic decision report",strategic_report(data,mat,cfg,demo_mode),file_name="cie_strategy.html",mime="text/html")
     show(gaps.head(100),"report_research_questions")

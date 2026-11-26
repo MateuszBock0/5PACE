@@ -162,6 +162,14 @@ def graph(data, product_ids, include_evidence=False):
         if pid in product_ids and r["Status"] in ("Supported","Partially supported"):
             g.add_node(cid,label=value(caps.get(cid,{}),"Capability Name") or cid,kind="Capability")
             g.add_edge(pid,cid,relation=r["Status"])
+    for r in records(data,"Deployments"):
+        pid=value(r,"Product ID"); customer=value(r,"Customer Organisation")
+        if pid in product_ids and customer:
+            # Keep distinct deployments as nodes to avoid implying unsupported
+            # equivalence or direct commercial contracts.
+            did=value(r,"Deployment ID")
+            g.add_node(did,label=customer+" · "+value(r,"Deployment Status"),kind="Deployment")
+            g.add_edge(pid,did,relation=value(r,"Deployment Status") or "reported record")
     if include_evidence:
         for r in records(data,"Capability Assessment"):
             pid=value(r,"Product ID")

@@ -160,6 +160,9 @@ def validate(data, previous=None):
         from product_intelligence import validate_mapping
         errors.extend(validate_mapping(data))
     if previous:
+        for name in ("AIT-VISTA Capabilities","AIT-VISTA System Functions"):
+            if name in previous and name not in data:
+                errors.append(f"{name}: previously synchronised worksheet disappeared")
         for name, field in IDS.items():
             if name == "Main":  # derived current view, not immutable history
                 continue

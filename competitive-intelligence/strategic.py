@@ -93,8 +93,8 @@ def stale_evidence(data, days=90, today=None):
     rows=[]
     for r in records(data,"Capability Assessment"):
         if value(r,"Assessment ID") not in ids: continue
-        checked=pd.to_datetime(value(r,"Source Checked Date"),errors="coerce")
-        age=(today-checked).days if pd.notna(checked) else None
+        checked=pd.to_datetime(value(r,"Source Checked Date"),errors="coerce",utc=True)
+        age=(today.date()-checked.date()).days if pd.notna(checked) else None
         if age is None or age>=days or age<0:
             rows.append({"Assessment ID":value(r,"Assessment ID"),"Product ID":value(r,"Product ID"),
                          "Capability ID":value(r,"Capability ID"),"Checked":value(r,"Source Checked Date"),

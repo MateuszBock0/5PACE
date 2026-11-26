@@ -17,7 +17,12 @@ def credentials(interactive=False):
     from google_auth_oauthlib.flow import InstalledAppFlow
     c = Credentials.from_authorized_user_file(str(TOKEN), SCOPE) if TOKEN.exists() else None
     if c and not c.valid and c.refresh_token:
-        c.refresh(Request())
+        try:
+            c.refresh(Request())
+        except Exception:
+            if not interactive:
+                raise RuntimeError("OAuth refresh failed. Run AUTHORISE_WINDOWS.bat while online.") from None
+            c=None
     if not c or not c.valid:
         if not interactive:
             raise RuntimeError("Google OAuth not configured. Run AUTHORISE_WINDOWS.bat.")

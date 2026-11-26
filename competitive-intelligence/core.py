@@ -213,7 +213,11 @@ def due(conn,hours=24,now=None):
     last=state(conn,"last_successful_sync")
     if not last or not state(conn,"current_hash"):
         return True
-    return ((now or datetime.now(timezone.utc))-datetime.fromisoformat(last)).total_seconds()>=3600*hours
+    try:
+        age=((now or datetime.now(timezone.utc))-datetime.fromisoformat(last)).total_seconds()
+        return age<0 or age>=3600*hours
+    except (TypeError,ValueError):
+        return True
 
 def log(conn,status,detail):
     conn.execute("INSERT INTO sync_log VALUES (?,?,?)",(utcnow(),status,str(detail)[:4000]))

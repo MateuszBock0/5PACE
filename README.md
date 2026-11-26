@@ -2,7 +2,7 @@
 
 ## Competitive Intelligence Engine
 
-A local, offline-first analytical application for a structured competitive-intelligence workbook. Google Sheets is a read-only source; all analysis and historical data are retained locally.
+Version 1.0.0-rc1 — a local, offline-first analytical application for a structured competitive-intelligence workbook. Google Sheets is a read-only source; all analysis and historical data are retained locally.
 
 ### Windows workflow
 

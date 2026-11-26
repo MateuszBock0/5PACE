@@ -1,6 +1,6 @@
 # Competitive Intelligence Engine
 
-Version 0.1.0 — initial integrated prototype.
+Version 1.0.0-rc1 — integrated operational release candidate.
 
 ## First-time installation and authentication
 
@@ -54,7 +54,49 @@ The archived payload includes every source worksheet's displayed values, not ori
 
 Configuration keys: priority_capabilities (list of real Capability IDs), vista_capabilities (ID to Planned/Implemented/Demonstrated/Verified), function_mapping (capability ID to list of internal function IDs), min_shared_capabilities.
 
-The application does not equate market scarcity with demand or observed research activity with product releases. Commercial records preserve currencies and price bases. Full commercial threat modelling, automated external research, exact product-release reconstruction, uncertainty calibration and integration with a separate systems-engineering repository require reviewed methodology and additional data; they are not claimed as implemented. Similarity and gap analysis are exploratory on sparse data.
+The application does not equate market scarcity with demand or observed research activity with product releases. Commercial records preserve currencies and price bases. The commercial MCDA module combines functional overlap, space-sector relevance, commercial availability and documented adoption as explicit scenario intervals, with user-adjustable criterion weights and sensitivity scenarios. Price is deliberately not scored because price bases and currencies are not comparable without additional evidence. No calibrated threat probability is claimed.
+
+## Roadmap completion and acceptance
+
+| Version | Delivered capability |
+| --- | --- |
+| 0.1 | Read-only API, validation, SQLite history and 24-hour offline-first refresh |
+| 0.2 | Intelligence overview, company and product exploration |
+| 0.3 | Capability matrix and evidence-level comparison |
+| 0.4 | Ownership, capability, deployment and evidence graph |
+| 0.5 | Research prioritisation and stale-source review queue |
+| 0.6 | Functional overlap bounds, commercial MCDA, sensitivity and sparse similarity/clustering |
+| 0.7 | Snapshot changes, evidence-state transitions and fixed-cohort convergence analysis |
+| 0.8 | Source-based AIT-VISTA criterion and function traceability, local maturity assessment |
+| 0.9 | Opportunity hypotheses, supplier/integration diligence, local demand-evidence register, strategic HTML report |
+| 1.0 RC | Integrated Windows workflows, offline import/export, regression and UI tests |
+
+The workbook's optional AIT-VISTA Capabilities and AIT-VISTA System Functions tabs are imported and validated together when present. The latter has two side-by-side registers: its blank separator and duplicate Functionality heading are represented by distinct internal column names. Existing 12-tab snapshots remain readable. Mapped market capabilities are comparison proxies only; the application does not infer implementation maturity from the system function list. Enter maturity and demand validation locally in the UI. Unknown remains unknown.
+
+The strategic workspace identifies hypotheses and potential suppliers, not verified partners or validated opportunities. A user-declared demand reference is required before marking demand validated; the application does not independently verify it. Market evolution distinguishes new research evidence from actual commercial releases. Automated external research remains the responsibility of the existing spreadsheet process.
+
+## Updating an existing checkout
+
+If the repository was cloned from a feature branch, close the application and switch once to main after the release PR has merged:
+
+    git fetch origin
+    git switch main
+    git pull --ff-only
+
+If main does not exist locally, use git switch --track origin/main. Afterwards run UPDATE_WINDOWS.bat for routine code updates. Your ignored local files are not part of Git. Do not use git clean -x or hard reset to update the application.
+
+## Acceptance checklist on the target computer
+
+1. Run INSTALL_WINDOWS.bat and open START_WINDOWS.bat with no internet after dependencies have been installed.
+2. Check the synthetic demo, then leave demo mode and configure the real workbook.
+3. Authorise read-only OAuth and run SYNC_NOW.bat. Inspect the source validation result and mapping counts.
+4. Disconnect internet and restart. Verify company profiles, matrices, graph, reports and strategy pages are available.
+5. Force sync offline and confirm that the prior local snapshot is retained. Reconnect, sync and confirm distinct snapshots are archived and identical payloads are deduplicated.
+6. Verify historical comparison and restore, then sync again to return to the current source.
+7. Close the app and run UPDATE_WINDOWS.bat. Verify the SQLite archive, config and credentials remain.
+8. Verify the source workbook remains unchanged.
+
+Release candidate status is intentional until real Windows/OAuth acceptance is completed. Automated tests use synthetic data, not a live Google account.
 
 ## Tests
 

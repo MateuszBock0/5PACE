@@ -1,0 +1,8 @@
+/competitive-intelligence/.venv/
+/competitive-intelligence/data/
+/competitive-intelligence/credentials/
+/competitive-intelligence/config.local.json
+/competitive-intelligence/reports/
+__pycache__/
+.pytest_cache/
+*.pyc

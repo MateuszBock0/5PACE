@@ -1,0 +1,13 @@
+{
+  "spreadsheet_id": "",
+  "refresh_interval_hours": 24,
+  "request_timeout_seconds": 20,
+  "priority_capabilities": [],
+  "vista_capabilities": {},
+  "function_mapping": {},
+  "min_shared_capabilities": 5,
+  "commercial_weights": {"Functional overlap": 5, "Space relevance": 3, "Commercial availability": 2, "Documented adoption": 2},
+  "research_stale_days": 90,
+  "function_maturity": {},
+  "demand_validation": {}
+}

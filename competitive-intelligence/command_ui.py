@@ -7,7 +7,7 @@ from advanced_ui import save_settings
 from analytics import matrix, DISPLAY
 from product_intelligence import criterion_matrix, CRITERIA, mappings
 from command_engine import (ASSESS, VIEW, registry, direct_matrix, direct_current, matrix_audit,
-    profile, scope_ids, threat_table, advantages, research_queue, comparison_changes, BASE_STATES, MATURITY, SCOPE)
+    profile, scope_ids, threat_table, advantages, research_queue, comparison_changes, overlap_history, BASE_STATES, MATURITY, SCOPE)
 
 def table(st,df,key):
     st.dataframe(df,use_container_width=True,hide_index=True)
@@ -67,13 +67,14 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         top=threat.head(12).copy()
         top["Threat interval"]=top.apply(lambda r:f"{r['Threat lower']:.0%}–{r['Threat upper']:.0%}",axis=1)
         top["Determinate scope"]=top["Known weight"].map(lambda v:f"{v:.0%}")
-        table(st,top[["Product","Company","Role","Threat interval","Determinate scope","Review action"]],"watch-first")
+        table(st,top[["Product","Company","Role","Threat interval","Determinate scope","Why watch","Review action"]],"watch-first")
         st.subheader("Competitive landscape")
         d=threat.dropna(subset=["Overlap lower","Market lower"]).copy()
         d["Overlap uncertainty"]=(d["Overlap upper"]-d["Overlap lower"]).clip(lower=0)
         d["Market uncertainty"]=(d["Market upper"]-d["Market lower"]).clip(lower=0)
         if not d.empty:
-            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Role",hover_name="Product",hover_data=["Company","Product ID","Overlap upper","Market upper","Known weight","Commercial status","Space relevance"],error_x="Overlap uncertainty",error_x_minus=[0]*len(d),error_y="Market uncertainty",error_y_minus=[0]*len(d))
+            d["Zero"]=0.
+            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Role",hover_name="Product",hover_data=["Company","Product ID","Overlap upper","Market upper","Known weight","Commercial status","Space relevance","Why watch"],error_x="Overlap uncertainty",error_x_minus="Zero",error_y="Market uncertainty",error_y_minus="Zero")
             fig.update_traces(marker={"size":10})
             fig.add_vline(x=.5,line_dash="dot");fig.add_hline(y=.5,line_dash="dot")
             fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%","title":"Functional scope overlap (lower bound + uncertainty)"},yaxis={"range":[0,1.05],"tickformat":".0%","title":"Commercial / space / adoption evidence (lower + uncertainty)"},height=550)
@@ -82,6 +83,14 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         intervals(st,top,"Threat lower","Threat upper","Product","Weighted threat scenario")
         st.subheader("Where AIT-VISTA stands")
         st.caption("Compared against best observed competitor in the chosen cohort. Missing evidence prevents definitive market-wide claims.")
+        candidate=av[av["AIT-VISTA"]!="Not applicable"].copy()
+        candidate["Existing positive verdicts"]=(candidate["Existing full support"]+candidate["Existing partial support"])/candidate["Eligible competitors"].replace(0,float("nan"))
+        candidate["Unresolved share"]=candidate["Unresolved"]/candidate["Eligible competitors"].replace(0,float("nan"))
+        if not candidate.empty:
+            fig=go.Figure(go.Bar(x=candidate["Existing positive verdicts"],y=candidate["Criterion ID"],orientation="h",name="Observed positive verdicts",customdata=candidate[["Criterion","Assessment"]],hovertemplate="%{customdata[0]}<br>%{customdata[1]}<br>Positive: %{x:.0%}<extra></extra>"))
+            fig.add_trace(go.Bar(x=candidate["Unresolved share"],y=candidate["Criterion ID"],orientation="h",name="Unresolved (possible overlap)",marker={"color":"#828b99"},hovertemplate="Unresolved: %{x:.0%}<extra></extra>"))
+            fig.update_layout(barmode="stack",xaxis={"range":[0,1],"tickformat":".0%","title":"Share of selected applicable competitors"},height=max(420,24*len(candidate)+100),title="Existing competition vs unresolved differentiation hypotheses")
+            st.plotly_chart(fig,use_container_width=True)
         table(st,av[["Criterion","AIT-VISTA","Assessment","Existing full support","Existing partial support","Unresolved","Demand"]],"position-summary")
         actual=av.dropna(subset=["Delta lower","Delta upper"]).copy()
         if not actual.empty:
@@ -185,6 +194,25 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
                     table(st,changes,"comparison-changes")
                     st.plotly_chart(px.bar(changes.groupby(["Product ID","Interpretation"]).size().reset_index(name="Changes"),x="Changes",y="Product ID",color="Interpretation",orientation="h"),use_container_width=True)
         else: st.info("A second distinct snapshot is needed to compare recorded changes.")
+        st.subheader("Recorded overlap evolution")
+        if not demo_mode and len(snapshots)>1 and scope and ids:
+            chosen=st.multiselect("Track products",ids,default=(threat["Product ID"].head(4).tolist() if not threat.empty else ids[:4]),format_func=names.get,key="cmd-track")
+            if chosen:
+                with connect() as conn:
+                    historical=[(s[1],read_snapshot(conn,s[0])) for s in reversed(snapshots[:30])]
+                historical=[(stamp,d) for stamp,d in historical if d is not None]
+                evolution=overlap_history(historical,chosen,scope,weights)
+                if evolution.empty: st.info("No comparable historical direct assessment data.")
+                else:
+                    fig=go.Figure()
+                    for p,g in evolution.groupby("Product ID",sort=False):
+                        fig.add_trace(go.Scatter(x=g.Snapshot,y=g.Lower,mode="lines+markers",name=names.get(p,p)+" lower",customdata=g[["Upper","Known weight"]],hovertemplate="Lower %{y:.0%}<br>Upper %{customdata[0]:.0%}<br>Determinate %{customdata[1]:.0%}<extra></extra>"))
+                        fig.add_trace(go.Scatter(x=g.Snapshot,y=g.Upper,mode="lines",line={"dash":"dot"},name=names.get(p,p)+" upper"))
+                    fig.update_layout(yaxis={"range":[0,1],"tickformat":".0%","title":"Recorded functional overlap interval"},height=420)
+                    st.plotly_chart(fig,use_container_width=True)
+                    table(st,evolution,"comparison-evolution")
+                st.caption("Fixed selected criterion set and weights. Not applicable treated as unresolved here for a stable denominator. Changes in recorded evidence do not establish product evolution.")
+        else: st.info("At least two distinct snapshots and a selected baseline scope are required.")
         st.subheader("Latest source observations")
         obs=pd.DataFrame(data["Observations"]["rows"])
         if not obs.empty: table(st,obs.sort_values("Date added (ISO)",ascending=False).head(20) if "Date added (ISO)" in obs else obs.head(20),"watch-observations")

@@ -26,3 +26,18 @@ def test_workspaces_with_mapping(monkeypatch,tmp_path):
     for page in ["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]:
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception, f"{page}: {app.exception}"
+
+def test_command_workspaces(monkeypatch,tmp_path):
+    from test_command import comparison_fixture
+    original=core.connect
+    db=tmp_path/"command.db"
+    with original(db) as conn:
+        core.store(conn,comparison_fixture())
+    monkeypatch.setattr(core,"connect",lambda:original(db))
+    app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=40).run()
+    assert not app.exception
+    for view in ["Executive dashboard","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"]:
+        next(r for r in app.radio if r.label=="Command workspace").set_value(view).run()
+        assert not app.exception, f"{view}: {app.exception}"
+    next(r for r in app.radio if r.label=="AIT-VISTA comparison baseline").set_value("As-Is").run()
+    assert not app.exception

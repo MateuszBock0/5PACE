@@ -45,3 +45,10 @@ def test_append_only():
     d[ASSESS]["rows"][0]["Assessment rationale"]="changed"
     assert any("modified" in x for x in validate(d,b)[0])
     assert comparison_changes(b,d).empty  # same verdict/evidence/id; immutable change rejected
+
+def test_fixed_overlap_history():
+    a=comparison_fixture(); b=copy.deepcopy(a)
+    b[ASSESS]["rows"][1]["Verdict"]="Unknown"
+    d=overlap_history([("old",a),("new",b)],["DEMO-P2"],["CR1"],{"CR1":1})
+    assert d.Lower.tolist()==[0,0]
+    assert d.Upper.tolist()==[0,1]

@@ -1,7 +1,6 @@
 """Direct evidence and local strategic scenarios. No source writes or inferred verdicts."""
 from collections import defaultdict
 from datetime import date
-import math
 import pandas as pd
 from core import value, split_ids
 from analytics import KNOWN, EVIDENCE_RANK, score_bounds
@@ -150,8 +149,13 @@ def threat_table(data,mat,weights,criterion_weights=None):
         elif role=="Potential entrant": action="Monitor entry signals"
         elif role=="Indirect": action="Monitor selectively"
         else: action="Classify customer/use-case overlap"
+        criteria=registry(data,CRITERIA,"Criterion ID")
+        supported=[value(criteria[c],"Product criterion") for c in cols if r[c]=="Supported"]
+        partial=[value(criteria[c],"Product criterion") for c in cols if r[c]=="Partially supported"]
+        unknown=[c for c in cols if r[c] not in KNOWN and r[c]!="Not applicable"]
+        reason=("Full recorded criterion support: "+", ".join(supported[:3])) if supported else ("Partial recorded scope: "+", ".join(partial[:3])) if partial else "No positive direct criterion verdict in selected scope"
         rows.append({"Product ID":pid,"Product":value(p,"Product Name"),"Company":value(companies.get(value(p,"Company ID"),{}),"Company Name"),
-            "Role":role,"Source priority":value(p,"Strategic Priority"),"Review action":action,
+            "Role":role,"Source priority":value(p,"Strategic Priority"),"Review action":action,"Why watch":reason,"Unresolved criteria":len(unknown),
             "Overlap lower":float(b.loc[pid,"Lower"]),"Overlap upper":float(b.loc[pid,"Upper"]),
             "Market lower":float(commercial.loc[pid,"Lower"]),"Market upper":float(commercial.loc[pid,"Upper"]),
             "Threat lower":low,"Threat upper":high,"Known weight":known,"Technical/independent records":strong,
@@ -176,6 +180,7 @@ def advantages(data,mat,cfg,mode):
         actual=our in KNOWN
         best=max((KNOWN[v] for v in known),default=None)
         if our=="Not applicable": label="Outside selected scope"
+        elif not n: label="No applicable competitor in cohort"
         elif actual and best is not None and KNOWN[our]<best: label="Observed disadvantage"
         elif our=="Target" and best==1: label="Planned parity / existing offer"
         elif actual and complete and KNOWN[our]==best: label="Observed parity"
@@ -229,3 +234,18 @@ def comparison_changes(before,after):
         if (s0,e0,ids0)==(s1,e1,ids1): continue
         out.append({"Product ID":pair[0],"Criterion ID":pair[1],"Before":s0,"After":s1,"Evidence before":e0,"Evidence after":e1,"Record IDs":ids1,"Interpretation":"New recorded knowledge" if s0=="Unassessed" else "Recorded evidence/assessment changed; product release not established"})
     return pd.DataFrame(out)
+
+def overlap_history(snapshots,product_ids,criteria,weights):
+    """Fixed criterion set. Missing historical criteria are not scored."""
+    rows=[]
+    for stamp,data in snapshots:
+        if ASSESS not in data or not set(criteria).issubset(registry(data,CRITERIA,"Criterion ID")):
+            continue
+        ids=[p for p in product_ids if p in registry(data,"Products","Product ID")]
+        if not ids or not criteria: continue
+        m=direct_matrix(data,ids,criteria)
+        # Treat changing applicability as unresolved for a fixed denominator.
+        m=m.replace("Not applicable","Unknown")
+        for r in score_bounds(m,weights).to_dict("records"):
+            rows.append({"Snapshot":stamp,**r})
+    return pd.DataFrame(rows,columns=["Snapshot","Product ID","Lower","Upper","Known weight"])

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0-rc1 — Competitive Command Centre
+
+- Default decision-oriented workspace, direct comparison ledger validation and conflict-aware current verdicts.
+- Evidence-bounded threat scenario and landscape, cohort-specific advantage register, direct benchmark and competitor evidence profile.
+- Local As-Is/MVP/Target profiles, team-estimated strategic priority map, delivery option rationale, research queue and snapshot change watchlist.
+- Keep proxy and direct assessments separate; check derived matrix against ledger without silently rewriting source.
+- Existing 14 workspaces remain available. Customer demand, actual maturity and effort require manual evidence. Release candidate pending live acceptance.
+
 ## 1.0.0-rc1 synchronisation hotfix
 
 - Ignore unchecked Space industry checkbox-only template rows in Observations and Main; retain all real records and strict ID checks.

@@ -172,6 +172,11 @@ def validate(data, previous=None):
     if "AIT-VISTA Capabilities" in data or "AIT-VISTA System Functions" in data:
         from product_intelligence import validate_mapping
         errors.extend(validate_mapping(data))
+    from command_engine import validate_comparisons, matrix_audit, ASSESS
+    errors.extend(validate_comparisons(data,previous))
+    if ASSESS in data and not errors:
+        issues=matrix_audit(data)
+        if issues: warnings.append(f"Derived comparison matrix: {len(issues)} discrepancy notices; ledger authoritative")
     if previous:
         for name in ("AIT-VISTA Capabilities","AIT-VISTA System Functions"):
             if name in previous and name not in data:

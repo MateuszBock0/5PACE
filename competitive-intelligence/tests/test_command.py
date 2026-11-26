@@ -27,16 +27,16 @@ def test_direct_ledger_and_conflict():
 
 def test_threat_and_advantage_bounds():
     d=comparison_fixture();m=direct_matrix(d)
-    assert profile({},"CR1","As-Is")=="Unknown"
+    assert profile({},"CR1","As-Is")=="Supported"
     assert profile({},"CR1","Target")=="Target"
     t=threat_table(d,m,{"CR1":1})
     assert t.iloc[0].Role=="Direct"
     assert (t["Threat lower"]<=t["Threat upper"]).all()
-    assert advantages(d,m,{},"As-Is").iloc[0].Assessment=="Insufficient evidence"
+    assert advantages(d,m,{},"As-Is").iloc[0].Assessment=="Observed parity"
     cfg={"command_profiles":{"CR1":{"status":"Supported","stage":"Verified","reference":"test","demand":"Validated","demand_reference":"interview"}}}
-    assert advantages(d,m.loc[["DEMO-P2"]],cfg,"As-Is").iloc[0].Assessment.startswith("Evidence-backed")
+    assert advantages(d,m.loc[["DEMO-P2"]],cfg,"As-Is").iloc[0].Assessment=="Functional advantage (selected cohort)"
     d[ASSESS]["rows"].pop()
-    assert advantages(d,direct_matrix(d),cfg,"As-Is").iloc[0].Assessment!="Evidence-backed advantage (selected cohort)"
+    assert advantages(d,direct_matrix(d),cfg,"As-Is").iloc[0].Assessment!="Functional advantage (selected cohort)"
     assert direct_matrix(d).loc["DEMO-P2","CR1"]=="Unassessed"
     assert not research_queue(d,direct_matrix(d),cfg).empty
 
@@ -52,3 +52,12 @@ def test_fixed_overlap_history():
     d=overlap_history([("old",a),("new",b)],["DEMO-P2"],["CR1"],{"CR1":1})
     assert d.Lower.tolist()==[0,0]
     assert d.Upper.tolist()==[0,1]
+
+def test_declared_baseline_without_evidence():
+    d=comparison_fixture()
+    assert scope_ids(d,{},"As-Is")==["CR1"]
+    a=advantages(d,direct_matrix(d,["DEMO-P2"]),{},"As-Is").iloc[0]
+    assert a.Assessment=="Functional advantage (selected cohort)"
+    assert a.Demand=="Unvalidated"
+    assert a["AIT-VISTA basis"]=="Team-declared functionality"
+    assert profile({"command_profiles":{"CR1":{"status":"Partially supported"}}},"CR1","As-Is")=="Partially supported"

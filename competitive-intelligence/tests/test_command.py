@@ -101,3 +101,14 @@ def test_weak_evidence_does_not_confirm_inferiority():
     m=direct_matrix(d,["DEMO-P1"])
     assert advantages(d,m,cfg,"As-Is").iloc[0].Assessment.startswith("Potential disadvantage")
     assert head_to_head(d,m,cfg,"DEMO-P1","As-Is").iloc[0].Comparison.startswith("Provisional")
+
+def test_negative_space_mentions_do_not_promote_direct_role():
+    from competitive_roles import classify
+    row={"Product Category":"Assembly Guidance","Primary Use Case":"Visually inspect industrial assembly","Target Customers":"Manufacturing teams; spacecraft customer unverified","Space Industry Applicability":"Not established"}
+    assert classify(row)["Analytical role"]=="Cross-industry competitor candidate"
+    row["Space Industry Applicability"]="Space offering"
+    assert classify(row)["Analytical role"]=="Direct visual AIT candidate"
+    row["Space Industry Applicability"]="Space AIT R&D heritage"
+    assert classify(row)["Analytical role"]=="Cross-industry competitor candidate"
+    row={"Product Category":"Manufacturing Traceability","Primary Use Case":"Manage hardware manufacturing travellers and work plans","Space Industry Applicability":"Space offering","Target Customers":"Hardware engineering teams"}
+    assert classify(row)["Analytical role"]=="Workflow / procurement substitute candidate"

@@ -104,7 +104,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         st.subheader("Inspect competitive position")
         pid=st.selectbox("Select product (or select a point on the map)",ids,index=ids.index(chosen_pid) if chosen_pid else 0,format_func=names.get,key="cmd-map-inspect-"+(chosen_pid or "manual"))
         st.write(classifications[pid])
-        st.write({k:value(products[pid],k) for k in ["Primary Use Case","Target Customers","Target Industries","Deployment Architecture","Product Family","Product URL"]})
+        st.write({k:value(products[pid],k) for k in ["Primary Use Case","Target Customers","Target Industries","Deployment Architecture","Product Family","Space Industry Applicability","Space Deployment Evidence","Related Observation IDs","Product URL","Notes"]})
         table(st,head_to_head(data,allmat,cfg,pid,mode),"map-product-evidence")
         with st.expander("Underlying comparison evidence and limitations"):
             table(st,pd.DataFrame([r for r in data[ASSESS]["rows"] if value(r,"Product ID")==pid]),"map-product-ledger")
@@ -155,7 +155,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         st.plotly_chart(fig,use_container_width=True)
         table(st,bm.rename(index=names,columns=labels).rename_axis("Product").reset_index(),"direct-matrix")
         pid=st.selectbox("Competitor profile",chosen,format_func=names.get,key="cmd-pid")
-        st.write({k:value(products[pid],k) for k in ["Competition Type","Strategic Priority","Primary Use Case","Target Customers","Commercial Status","Deployment Architecture","Space Industry Applicability","Product URL"]})
+        st.write({k:value(products[pid],k) for k in ["Competition Type","Strategic Priority","Primary Use Case","Target Customers","Target Industries","Commercial Status","Deployment Architecture","Space Industry Applicability","Space Deployment Evidence","Related Observation IDs","Product URL","Notes"]})
         if not threat.empty: table(st,threat[threat["Product ID"]==pid].drop(columns=["Rank group"]),"profile-threat")
         st.write(classifications[pid])
         table(st,head_to_head(data,allmat,cfg,pid,mode),"profile-relative-position")

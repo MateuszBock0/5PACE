@@ -244,6 +244,10 @@ def research_queue(data,mat,cfg,snapshot_date=""):
             role_weight=5 if classify(pr)["Analytical role"] in {"Direct visual AIT candidate","Workflow / procurement substitute candidate"} else 3 if role in {"Direct","Adjacent / substitute"} else 1
             priority=role_weight+imp+(3 if s=="Disputed" else 2 if s in {"Unknown","Unassessed","Announced"} else 1)+(1 if stale else 0)
             ids={x for r in e.get("rows",[]) for field in ("Comparison ID","Related Assessment IDs","Related Observation IDs","Related Evidence IDs") for x in split_ids(r.get(field))}
+            # Product-level references are relevant starting points, not direct
+            # criterion verdicts. Include them for empty/unknown comparisons.
+            ids.update(split_ids(pr.get("Related Observation IDs")))
+            ids.update(split_ids(pr.get("Space Deployment Evidence")))
             reasons=[s] if s not in KNOWN else []
             if weak: reasons.append("Weak or missing evidence")
             if stale: reasons.append("Assessment review due")
@@ -252,7 +256,7 @@ def research_queue(data,mat,cfg,snapshot_date=""):
               "Priority":priority,"Existing evidence IDs":"; ".join(sorted(ids)),"Reason for uncertainty":"; ".join(reasons),"Snapshot date":snapshot_date})
         cl=classify(pr)
         if cl["Missing context"] or cl["Analytical role"]=="Unresolved role" or cl["Analytical role"].endswith("candidate"):
-            refs={x for field in ("Related Observation IDs",) for x in split_ids(pr.get(field))}
+            refs={x for field in ("Related Observation IDs","Space Deployment Evidence") for x in split_ids(pr.get(field))}
             out.append({"Product ID":p,"Criterion ID":"","Research question":f"Establish {value(pr,'Product Name')}'s target buyer, procurement overlap, AIT use case, independent availability and deployment architecture. Distinguish platform and modules.",
                 "Strategic decision affected":"Competitive classification / substitution / monitoring priority",
                 "Priority":10 if role=="Direct" else 7,"Existing evidence IDs":"; ".join(sorted(refs)),

@@ -24,8 +24,17 @@ def classify(p):
     industries=value(p,"Target Industries")
     commercial=value(p,"Commercial Status")
     role=value(p,"Competition Type")
-    text=(use+" "+customers+" "+industries).lower()
-    space=any(x in text for x in ("spacecraft","satellite","space hardware","space manufacturing","space equipment","space-equipment","space-sector","space / aerospace"))
+    # Use structured positive space evidence, not arbitrary narrative mentions:
+    # "spacecraft customer unverified" is not positive market-fit evidence.
+    space_status=value(p,"Space Industry Applicability")
+    positive_space={"Space offering","Space manufacturing deployment","Space AIT deployment","Space manufacturing adoption signal"}
+    space=space_status in positive_space
+    # A clearly positive primary use case can support a *candidate* when the
+    # structured field is missing, but never override an explicit Not established.
+    if not space_status:
+        use_lower=use.lower()
+        neg=any(x in use_lower for x in ("unverified","not established","not confirmed","no spacecraft","no satellite","unknown"))
+        space=not neg and any(x in use_lower for x in ("spacecraft","satellite","space hardware","space manufacturing","space-equipment"))
     visual=any(x in use.lower() for x in ("visual","camera","image","3d sensor","optical","photograph","computer vision","inspect"))
     assembly=any(x in use.lower() for x in ("assembly","ait","integration","component","workmanship","procedure","inspection"))
     checkout=cat=="Spacecraft Checkout Systems" or ("checkout" in use.lower() and not visual)
@@ -33,11 +42,11 @@ def classify(p):
     elif commercial=="Historical": label="Historical solution"; why="Source commercial status: historical."
     elif commercial=="Research" or role=="Potential entrant": label="Research / emerging entrant"; why="Source research/entrant classification; commercial substitution not established."
     elif checkout: label="Complementary system"; why="Checkout/testing category or use case; visual AIT substitution not established."
-    elif use and space and visual and assembly and cat in VISUAL: label="Direct visual AIT candidate"; why="Recorded visual/assembly use case and space-sector relevance; same procurement and operational fit still require review."
-    elif use and space and cat in WORKFLOW: label="Workflow / procurement substitute candidate"; why="Recorded workflow/traceability/test use case and space relevance; same buying decision not established."
+    elif use and space and visual and assembly and cat in VISUAL: label="Direct visual AIT candidate"; why="Recorded visual/assembly use case and positive space relevance ("+(space_status or "primary use case")+"); same procurement and operational fit still require review."
+    elif use and space and cat in WORKFLOW: label="Workflow / procurement substitute candidate"; why="Recorded workflow/traceability/test use case and positive space relevance ("+(space_status or "primary use case")+"); same buying decision not established."
     elif cat in ENABLING: label="Enabling technology"; why="Product category indicates technology/tooling; integrated AIT substitution not established."
     elif cat in COMPLEMENT: label="Complementary system"; why="Measurement/checkout category; full AIT substitution not established."
-    elif use and cat in VISUAL|WORKFLOW: label="Cross-industry competitor candidate"; why="Recorded related workflow/visual use case; spacecraft customer and procurement overlap not established."
+    elif use and cat in VISUAL|WORKFLOW: label="Cross-industry competitor candidate"; why="Recorded related workflow/visual use case; current spacecraft market fit or procurement overlap not established."
     else: label="Unresolved role"; why="Insufficient explicit product-use-case/customer evidence for finer classification."
     missing=[f for f in ("Primary Use Case","Target Customers","Target Industries","Deployment Architecture") if not value(p,f)]
     track="Substitution candidates" if label in ROLES[:3] else "Unresolved classification" if label=="Unresolved role" else "Technology / complementary ecosystem" if label in {"Enabling technology","Complementary system"} else "Internal / emerging / historical"

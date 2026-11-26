@@ -93,3 +93,11 @@ def test_uncertainty_does_not_reduce_upper_exposure():
     m.loc["DEMO-P2","CR1"]="Unassessed"
     later=threat_table(d,m,{"CR1":1}).set_index("Product ID")
     assert later.loc["DEMO-P2","Threat upper"]>=initial.loc["DEMO-P2","Threat upper"]
+
+def test_weak_evidence_does_not_confirm_inferiority():
+    d=comparison_fixture()
+    d[ASSESS]["rows"][0]["Evidence level"]="Vendor claim"
+    cfg={"command_profiles":{"CR1":{"status":"Partially supported"}}}
+    m=direct_matrix(d,["DEMO-P1"])
+    assert advantages(d,m,cfg,"As-Is").iloc[0].Assessment.startswith("Potential disadvantage")
+    assert head_to_head(d,m,cfg,"DEMO-P1","As-Is").iloc[0].Comparison.startswith("Provisional")

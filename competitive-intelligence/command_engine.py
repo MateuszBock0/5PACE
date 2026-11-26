@@ -5,7 +5,7 @@ import pandas as pd
 from core import value, split_ids
 from analytics import KNOWN, EVIDENCE_RANK, score_bounds
 from strategic import commercial_mcda
-from competitive_roles import classify, family_root, family_watchlist, attention
+from competitive_roles import classify, family_root, attention
 from product_intelligence import source_rows, CRITERIA
 
 ASSESS="Comparison Assessment"
@@ -197,7 +197,9 @@ def advantages(data,mat,cfg,mode):
         best=max((KNOWN[v] for v in known),default=None)
         if our=="Not applicable": label="Outside selected scope"
         elif not n: label="No applicable competitor in cohort"
-        elif actual and best is not None and KNOWN[our]<best: label="Observed disadvantage"
+        elif actual and best is not None and KNOWN[our]<best:
+            stronger=[p for p in known.index if KNOWN[known[p]]>KNOWN[our]]
+            label="Observed disadvantage" if any(EVIDENCE_RANK.get(current.get((p,c),{}).get("evidence",""),0)>=3 for p in stronger) else "Potential disadvantage — weak competitor evidence"
         elif our=="Target" and best==1: label="Planned parity / existing offer"
         elif actual and complete and KNOWN[our]==best: label="Observed parity"
         elif actual and best==1 and KNOWN[our]==1: label="Recorded functional parity with at least one competitor"
@@ -301,7 +303,7 @@ def head_to_head(data,mat,cfg,pid,mode):
         elif KNOWN[ours]>KNOWN[theirs]: result="AIT-VISTA functional superiority"
         elif KNOWN[ours]<KNOWN[theirs]: result="Competitor functional superiority"
         else: result="Functional parity"
-        rows.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"AIT-VISTA":ours,"Competitor":theirs,"Comparison":result,"Evidence level":level,
+        rows.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"AIT-VISTA":ours,"AIT-VISTA As-Is":profile(cfg,c,"As-Is"),"Competitor":theirs,"Comparison":result,"Evidence level":level,
             "Comparison IDs":"; ".join(value(r,"Comparison ID") for r in e.get("rows",[])),
             "Limitations":"; ".join(value(r,"Limitations") for r in e.get("rows",[])),
             "Operational performance":"Not established by categorical verdict"})

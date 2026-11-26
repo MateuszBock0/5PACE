@@ -40,7 +40,8 @@ def classify(p):
     elif use and cat in VISUAL|WORKFLOW: label="Cross-industry competitor candidate"; why="Recorded related workflow/visual use case; spacecraft customer and procurement overlap not established."
     else: label="Unresolved role"; why="Insufficient explicit product-use-case/customer evidence for finer classification."
     missing=[f for f in ("Primary Use Case","Target Customers","Target Industries","Deployment Architecture") if not value(p,f)]
-    return {"Analytical role":label,"Classification basis":why,"Missing context":"; ".join(missing),"Source role":role or "Unclassified"}
+    track="Substitution candidates" if label in ROLES[:3] else "Unresolved classification" if label=="Unresolved role" else "Technology / complementary ecosystem" if label in {"Enabling technology","Complementary system"} else "Internal / emerging / historical"
+    return {"Analytical role":label,"Review track":track,"Classification basis":why,"Missing context":"; ".join(missing),"Source role":role or "Unclassified"}
 
 def family_watchlist(threat):
     """One row per explicit family. No merging of individual functional scores."""
@@ -55,6 +56,9 @@ def family_watchlist(threat):
         r["Family upper"]=g["Threat upper"].max()
         r["Family members"]=len(g)
         r["Member IDs"]="; ".join(g["Product ID"])
+        r["Member roles"]="; ".join(sorted(set(g["Analytical role"])))
+        r["Member tracks"]="; ".join(sorted(set(g["Review track"])))
+        r["Family attention"]=attention(r["Family lower"],r["Family upper"])
         rows.append(r)
     import pandas as pd
     out=pd.DataFrame(rows)
@@ -62,6 +66,7 @@ def family_watchlist(threat):
 
 def attention(lower,upper):
     # Configured triage convention, not calibrated probabilities or risk prediction.
+    if not (lower==lower and upper==upper): return "No comparable scenario"
     if upper<.65: return "Lower scenario exposure"
     if lower>=.65: return "High recorded exposure"
     return "Potential high exposure — unresolved"

@@ -67,12 +67,25 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         st.subheader("Who to watch first")
         st.caption("One entry per explicit product family. Upper scenario exposure first, then lower; broad intervals are unresolved, not low threats. Same-company products without explicit family links are not merged. The family interval is the maximum member bounds, not combined features.")
         families=family_watchlist(threat)
-        top=families.head(12).copy()
-        top["Threat interval"]=top.apply(lambda r:f"{r['Family lower']:.0%}–{r['Family upper']:.0%}",axis=1)
-        table(st,top[["Product","Company","Family members","Analytical role","Threat interval","Why watch","Review action"]],"watch-first")
+        families["Threat interval"]=families.apply(lambda r:f"{r['Family lower']:.0%}–{r['Family upper']:.0%}",axis=1)
+        candidates=families[families["Member tracks"].str.contains("Substitution candidates",regex=False)]
+        other=families[~families["Member tracks"].str.contains("Substitution candidates",regex=False)]
+        columns=["Product","Company","Family members","Member roles","Family attention","Threat interval","Why watch","Review action"]
+        st.markdown("**Substitution candidates — documented exposure**")
+        documented=candidates.sort_values(["Family lower","Family upper","Family ID"],ascending=[False,False,True])
+        if documented.empty: st.info("No substitution candidate in the selected cohort; classification may be incomplete.")
+        else: table(st,documented.head(12)[columns],"watch-documented")
+        st.markdown("**Substitution candidates — unresolved potential exposure**")
+        potential=candidates[candidates["Family attention"]=="Potential high exposure — unresolved"]
+        if potential.empty: st.info("No candidate crosses the selected uncertainty threshold.")
+        else: table(st,potential.head(12)[columns],"watch-potential")
+        with st.expander("Other roles and unresolved classification — monitor or investigate"):
+            table(st,other[columns],"watch-other")
+        top=candidates.head(12).copy() if not candidates.empty else families.head(12).copy()
+        st.caption("The documented view ranks lower bounds; the potential view ranks upper bounds. Neither is a calibrated threat ranking, and unresolved or non-substitution roles are not assumed harmless.")
         with st.expander("All products and provisional classification rationale"):
             table(st,threat.drop(columns=["Rank group"]),"all-threats")
-        st.caption("High scenario exposure convention: lower ≥ 65%; potential high exposure: upper ≥ 65% but lower below. This is not a probability or validated threshold.")
+        st.caption("High scenario exposure convention: lower ≥ 65%; potential high exposure: upper ≥ 65% but lower below. This is not a probability or validated threshold. Family representative is the actual product with the largest upper bound, then lower bound; the member roles are shown separately.")
         st.subheader("Competitive landscape")
         d=threat.dropna(subset=["Overlap lower","Market lower"]).copy()
         d["Overlap uncertainty"]=(d["Overlap upper"]-d["Overlap lower"]).clip(lower=0)
@@ -110,8 +123,14 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         table(st,av[["Criterion","AIT-VISTA","Assessment","Existing full support","Existing partial support","Unresolved","Demand","Customer importance (team estimate)","Operational performance comparison"]],"position-summary")
         st.subheader("Next decisions")
         actions=av[av["AIT-VISTA"]!="Not applicable"].copy()
-        actions["Next decision"]=actions.Assessment.map(lambda s:"Protect and validate customer value" if s.startswith("Functional advantage") else "Review development gap" if "disadvantage" in s else "Validate performance and positioning" if "parity" in s else "Resolve competitor evidence before claiming differentiation")
-        table(st,actions[["Criterion ID","Criterion","Assessment","Next decision","Demand"]],"next-decisions")
+        actions["Next decision"]=actions.Assessment.map(lambda s:"Protect and validate customer value" if s.startswith("Functional advantage") else "Review development gap" if s=="Observed disadvantage" else "Validate performance and positioning" if "parity" in s else "Resolve competitor evidence before claiming differentiation")
+        actions["Importance"]=actions["Criterion ID"].map(weights)
+        actions["Decision urgency"]=actions.Assessment.map(lambda s:3 if s=="Observed disadvantage" else 2 if s.startswith("Functional advantage") or s.startswith("Potential disadvantage") else 1)
+        actions["Review priority"]=actions["Importance"]*actions["Decision urgency"]
+        actions=actions.sort_values(["Review priority","Criterion ID"],ascending=[False,True])
+        if not actions.empty:
+            st.plotly_chart(px.bar(actions.head(12).sort_values("Review priority"),x="Review priority",y="Criterion ID",color="Next decision",orientation="h",hover_name="Criterion",hover_data=["Assessment","Importance"],title="Decision review priority — heuristic, not implementation effort"),use_container_width=True)
+        table(st,actions[["Criterion ID","Criterion","Assessment","Next decision","Demand","Review priority"]],"next-decisions")
         actual=av.dropna(subset=["Delta lower","Delta upper"]).copy()
         if not actual.empty:
             fig=go.Figure(go.Scatter(x=actual["Delta lower"],y=actual.Criterion,mode="markers",error_x={"type":"data","symmetric":False,"array":actual["Delta upper"]-actual["Delta lower"],"arrayminus":[0]*len(actual)}))

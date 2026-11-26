@@ -20,7 +20,7 @@ from advanced_ui import (commercial_page, product_page, strategic_page, evolutio
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.title("5PACE | Competitive Intelligence Engine")
-st.caption("v1.1.1-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.2.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)

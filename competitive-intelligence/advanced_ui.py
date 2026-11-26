@@ -113,13 +113,13 @@ def product_page(st,data,mat,pnames,cnames,cfg,show,demo_mode):
         st.subheader("Local function maturity register")
         with st.form("function-maturity"):
             fid=st.selectbox("System function",list(f["Function ID"]))
-            maturity=st.selectbox("Maturity",sorted(MATURITY))
+            maturity=st.selectbox("Maturity",sorted(MATURITY),index=sorted(MATURITY).index("Implemented"))
             submit=st.form_submit_button("Save local maturity",disabled=demo_mode)
             if submit:
                 values=config().get("function_maturity",{}); values[fid]=maturity
                 save_settings({"function_maturity":values})
                 st.success("Saved locally. Refresh interface to update profile.")
-        st.caption("Unknown by default. Maturity is user-entered and never inferred from the source mapping.")
+        st.caption("Listed functions are Implemented by default under the product owner declaration; optional local overrides remain available. This is not independent verification.")
 
 def strategic_page(st,data,mat,cnames,cfg,show,demo_mode):
     st.header("Strategic intelligence")

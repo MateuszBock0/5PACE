@@ -83,7 +83,7 @@ def function_profile(data,mat,product_id,local_maturity=None):
     for r in mappings(data).to_dict("records"):
         linked=split_ids(r["Market capability IDs"])
         s=[mat.loc[product_id,c] if c in mat.columns else "Unassessed" for c in linked]
-        rows.append({**r,"AIT-VISTA maturity":local_maturity.get(r["Function ID"],"Unknown"),
+        rows.append({**r,"AIT-VISTA maturity":local_maturity.get(r["Function ID"],"Implemented"),
                      "Supported proxies":s.count("Supported"),"Partial proxies":s.count("Partially supported"),
                      "Unresolved proxies":sum(x not in ("Supported","Partially supported","Explicitly unsupported","Not applicable") for x in s),
                      "Unsupported proxies":s.count("Explicitly unsupported")})

@@ -28,7 +28,7 @@ def test_side_by_side_mapping():
     cm=criterion_matrix(d,m)
     row=cm[(cm["Product ID"]=="DEMO-P1")].iloc[0]
     assert row["Supported"]==1 and row["Unresolved"]==1
-    assert function_profile(d,m,"DEMO-P1").iloc[0]["AIT-VISTA maturity"]=="Unknown"
+    assert function_profile(d,m,"DEMO-P1").iloc[0]["AIT-VISTA maturity"]=="Implemented"
     d["AIT-VISTA Capabilities"]["rows"][0]["Related market capability IDs"]="BAD"
     assert validate(d)[0]
 

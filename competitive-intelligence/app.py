@@ -15,11 +15,12 @@ from core import ROOT, config, connect, read_snapshot, history, state, restore, 
 from analytics import (frame, current_assessments, active_capabilities, matrix, coverage, score_bounds,
                        sensitivity, research_gaps, similarity, clusters, graph, capability_gaps, DISPLAY)
 from demo import fixture
+from command_ui import command_page
 from advanced_ui import (commercial_page, product_page, strategic_page, evolution_panel, research_panel, import_panel)
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.title("5PACE | Competitive Intelligence Engine")
-st.caption("v1.0.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.1.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -45,7 +46,7 @@ if st.sidebar.button("Refresh interface"):
 if st.sidebar.button("Sync data now",disabled=demo_mode):
     subprocess.Popen([sys.executable,str(ROOT/"sync.py"),"--force"],cwd=str(ROOT))
     st.sidebar.info("Sync started in a separate process. Refresh interface to inspect its result.")
-PAGES=["Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]
+PAGES=["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]
 page=st.sidebar.radio("Workspace",PAGES,index=0 if data is not None else len(PAGES)-1)
 
 def show(df, key=None):
@@ -81,6 +82,10 @@ if page=="Synchronisation":
         st.write({"errors":errors,"warnings":warnings})
     st.stop()
 if data is None:
+    st.stop()
+
+if page=="Command Centre":
+    command_page(st,data,cfg,demo_mode,snapshots,current)
     st.stop()
 
 co=frame(data,"Companies"); pro=frame(data,"Products"); cap=frame(data,"Capabilities")

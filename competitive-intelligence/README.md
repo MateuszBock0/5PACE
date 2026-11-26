@@ -107,3 +107,12 @@ From the application directory, after installation:
 On Linux/macOS, install requirements in a virtual environment and run python -m pytest -q.
 
 Tests use synthetic fixtures, never real competitive data or OAuth. First live sync, Windows launchers and OAuth consent must be verified on the target computer.
+
+
+## Command Centre (v1.1.0-rc1)
+
+Default workspace uses Comparison Assessment as authoritative direct evidence. Competitive Comparison is checked, not used as a second verdict source. Superseded rows remain in history; contradictory active verdicts become Disputed. The source matrix's descriptive second header row is not a product. Existing snapshots without the new ledger can use legacy workspaces.
+
+Select a competitor cohort and Target (intended criterion scope), MVP (locally selected) or As-Is (locally evidenced current implementation). Target includes source criteria unless excluded locally; no current product claim follows. Source competition classifications determine review group, not a verified substitution verdict. Threat interval combines weighted direct overlap, documented space relevance, commercial status and implementation records. Unknowns are intervals, partial support is 0.5 by convention; no market share or threat probability is inferred. Commercial-axis values are ordinal evidence scenarios. Strong claims need complete, sufficiently documented evidence across the chosen cohort, verified internal maturity and referenced customer demand; local references are user declarations, not independently validated.
+
+Product baseline settings, effort, strategic value and delivery rationale are local only. The map excludes unknown estimates. Direct benchmark, evidence history, proxy evidence, watchlist and research CSV exports are offline. Snapshot comparisons indicate recorded evidence changes, not actual product release dates. No external research or source writes from this application. Full automated build/buy/partner cost and requirements-ticket integration remain future work.

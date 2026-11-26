@@ -112,10 +112,10 @@ def matrix_audit(data):
 def profile(cfg,cid,mode):
     r=cfg.get("command_profiles",{}).get(cid,{})
     if mode=="As-Is":
-        # A current support claim needs an explicit implementation stage and reference.
-        if r.get("stage") in {"Implemented","Demonstrated","Verified"} and str(r.get("reference","")).strip():
-            return r.get("status","Unknown") if r.get("status") in BASE_STATES else "Unknown"
-        return "Unknown"
+        # Product owner declares the listed AIT-VISTA criteria implemented.
+        # Explicit local status overrides remain possible. No evidence gate.
+        status=r.get("status","Supported")
+        return status if status in BASE_STATES else "Unknown"
     scope=r.get("mvp","Unknown") if mode=="MVP" else r.get("target","Included")
     return {"Included":"Target","Excluded":"Not applicable"}.get(scope,"Unknown")
 
@@ -184,8 +184,9 @@ def advantages(data,mat,cfg,mode):
         elif actual and best is not None and KNOWN[our]<best: label="Observed disadvantage"
         elif our=="Target" and best==1: label="Planned parity / existing offer"
         elif actual and complete and KNOWN[our]==best: label="Observed parity"
-        elif actual and complete and KNOWN[our]>best and r.get("stage")=="Verified" and demand: label="Evidence-backed advantage (selected cohort)"
-        elif actual and best is not None and KNOWN[our]>best: label="Potential advantage — resolve evidence/demand"
+        elif actual and complete and KNOWN[our]>best: label="Functional advantage (selected cohort)"
+        elif actual and best is not None and KNOWN[our]>best: label="Potential advantage — incomplete competitor evidence"
+        elif actual and not len(positives): label="Potential advantage — unresolved competitor coverage"
         elif our=="Target" and complete and best<1: label="Planned differentiation hypothesis"
         elif our=="Target" and not len(positives): label="Research white-space hypothesis"
         elif our=="Target": label="Planned overlap — differentiation unproven"
@@ -199,6 +200,7 @@ def advantages(data,mat,cfg,mode):
             "Assessment":label,"Known competitors":len(known),"Eligible competitors":n,"Unresolved":unresolved,
             "Existing full support":int((known=="Supported").sum()),"Existing partial support":int((known=="Partially supported").sum()),
             "Best observed":best,"Delta lower":delta_low,"Delta upper":delta_high,"Demand": "Validated (local declaration)" if demand else "Unvalidated",
+            "AIT-VISTA basis":"Team-declared functionality" if mode=="As-Is" else "Selected scope",
             "Reference":r.get("reference",""),"Demand reference":r.get("demand_reference","")})
     return pd.DataFrame(result)
 

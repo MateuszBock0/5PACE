@@ -38,10 +38,11 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
     roles=sorted({value(r,"Competition Type") or "Unclassified" for r in products.values()})
     default_roles=[x for x in ["Direct","Adjacent / substitute","Potential entrant"] if x in roles] or roles
     left,right=st.columns(2)
-    mode=left.radio("AIT-VISTA comparison baseline",["Target","MVP","As-Is"],horizontal=True,key="cmd-mode")
+    mode=left.radio("AIT-VISTA comparison baseline",["As-Is","MVP","Target"],horizontal=True,key="cmd-mode")
     selected_roles=right.multiselect("Competitor cohort",roles,default=default_roles,key="cmd-roles")
     ids=[p for p,r in products.items() if (value(r,"Competition Type") or "Unclassified") in selected_roles]
-    if mode!="As-Is": st.info("Target/MVP describe intended scope, not implemented capability. Planned overlap is not a verified advantage.")
+    if mode=="As-Is": st.caption("AIT-VISTA listed criteria are treated as implemented, as declared by the product owner. Competitor evidence uncertainty remains explicit.")
+    else: st.info("Target/MVP are optional planning scenarios; As-Is is the default product baseline.")
     view=st.radio("Command workspace",["Executive dashboard","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"],horizontal=True,key="cmd-view")
     allmat=direct_matrix(data,ids)
     weights={c:cfg.get("command_profiles",{}).get(c,{}).get("importance",3) for c in criteria}
@@ -97,7 +98,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
             fig=go.Figure(go.Scatter(x=actual["Delta lower"],y=actual.Criterion,mode="markers",error_x={"type":"data","symmetric":False,"array":actual["Delta upper"]-actual["Delta lower"],"arrayminus":[0]*len(actual)}))
             fig.add_vline(x=0,line_dash="dash");fig.update_layout(xaxis={"range":[-1,1],"title":"AIT-VISTA minus best competitor (interval)"},height=max(380,28*len(actual)+100))
             st.plotly_chart(fig,use_container_width=True)
-        else: st.info("No current implementation baseline with evidence references; relative current advantage cannot yet be calculated.")
+        else: st.info("No applicable current comparison; select As-Is and an applicable competitor cohort.")
     elif view=="Benchmark & competitor profile":
         if not ids: return
         default=threat["Product ID"].head(6).tolist() if not threat.empty else ids[:6]
@@ -134,15 +135,15 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
             table(st,pd.DataFrame([r for r in data[tab]["rows"] if value(r,"Product ID")==pid]),"cmd-"+tab)
     elif view=="Product baseline & priorities":
         st.subheader("AIT-VISTA local baseline")
-        st.caption("Enter engineering evidence and customer validation manually. Source criteria describe intended scope only. Never infer implementation from a function mapping.")
+        st.caption("All listed AIT-VISTA criteria are treated as implemented by default, per product owner. No implementation evidence or maturity input is required. Edit only if an exception or optional planning estimate is needed.")
         cid=st.selectbox("Edit criterion",list(criteria),format_func=lambda c:c+" · "+labels[c],key="cmd-edit")
         r=cfg.get("command_profiles",{}).get(cid,{})
         def idx(options,v): return options.index(v) if v in options else 0
         with st.form("cmd-baseline-"+cid):
             a,b=st.columns(2)
-            stage=a.selectbox("Implementation maturity",MATURITY,index=idx(MATURITY,r.get("stage")))
-            status=b.selectbox("Current support verdict",BASE_STATES,index=idx(BASE_STATES,r.get("status")))
-            ref=st.text_input("Implementation evidence / verification reference",value=r.get("reference",""))
+            stage=a.selectbox("Implementation maturity",MATURITY,index=idx(MATURITY,r.get("stage","Implemented")))
+            status=b.selectbox("Current support verdict",BASE_STATES,index=idx(BASE_STATES,r.get("status","Supported")))
+            ref=st.text_input("Implementation reference (optional)",value=r.get("reference",""))
             a,b=st.columns(2)
             mvp=a.selectbox("MVP scope",SCOPE,index=idx(SCOPE,r.get("mvp")))
             target=b.selectbox("Target scope",SCOPE,index=idx(SCOPE,r.get("target","Included")))
@@ -155,16 +156,14 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
             trade=st.text_area("Trade-off rationale / cost, IP, dependencies and risks",value=r.get("tradeoff",""))
             submit=st.form_submit_button("Save local criterion profile",disabled=demo_mode)
         if submit:
-            if status!="Unknown" and (not ref.strip() or stage not in {"Implemented","Demonstrated","Verified"}):
-                st.error("Current support claim requires implementation maturity and an evidence reference.")
-            elif demand=="Validated" and not dref.strip(): st.error("Validated demand requires a reference.")
+            if demand=="Validated" and not dref.strip(): st.error("Validated customer demand requires a reference; this is separate from functionality.")
             else:
                 allp=dict(cfg.get("command_profiles",{}));allp[cid]={"stage":stage,"status":status,"reference":ref.strip(),"mvp":mvp,"target":target,"demand":demand,"demand_reference":dref.strip(),"importance":importance,"effort":effort,"strategic_value":strategic,"route":route,"tradeoff":trade}
                 save_settings({"command_profiles":allp});st.rerun()
         rows=[]
         for c in criteria:
             r=cfg.get("command_profiles",{}).get(c,{})
-            rows.append({"Criterion ID":c,"Criterion":labels[c],"As-Is":profile(cfg,c,"As-Is"),"MVP":profile(cfg,c,"MVP"),"Target":profile(cfg,c,"Target"),"Maturity":r.get("stage","Unknown"),"Effort":r.get("effort","Unknown"),"Strategic value":r.get("strategic_value","Unknown"),"Delivery option":r.get("route","Unassessed"),"Trade-off":r.get("tradeoff",""),"Implementation reference":r.get("reference",""),"Demand reference":r.get("demand_reference","")})
+            rows.append({"Criterion ID":c,"Criterion":labels[c],"As-Is":profile(cfg,c,"As-Is"),"MVP":profile(cfg,c,"MVP"),"Target":profile(cfg,c,"Target"),"Maturity":r.get("stage","Implemented (team-declared)"),"Effort":r.get("effort","Unknown"),"Strategic value":r.get("strategic_value","Unknown"),"Delivery option":r.get("route","Unassessed"),"Trade-off":r.get("tradeoff",""),"Implementation reference":r.get("reference",""),"Demand reference":r.get("demand_reference","")})
         df=pd.DataFrame(rows)
         st.subheader("Strategic priority map")
         scale={"Low":1,"Medium":2,"High":3}

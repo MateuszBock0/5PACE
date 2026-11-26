@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1-rc1 — Owner-declared AIT-VISTA baseline
+
+- Default As-Is comparison treats listed criteria as implemented, without requesting implementation evidence.
+- Retain optional status overrides, planning scopes and customer-demand inputs.
+- Separate functional differentiation from validated demand and commercial advantage.
+- Competition workbook is one source, not the master database of all 5PACE activities.
+
 ## 1.1.0-rc1 — Competitive Command Centre
 
 - Default decision-oriented workspace, direct comparison ledger validation and conflict-aware current verdicts.

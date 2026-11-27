@@ -89,7 +89,7 @@ def capture(out,live=False):
                 else:raise RuntimeError("Streamlit failed to start")
                 with sync_playwright() as pw:
                     browser=pw.chromium.launch(args=["--no-sandbox"])
-                    page=browser.new_page(viewport={"width":1600,"height":1080},device_scale_factor=1)
+                    page=browser.new_page(viewport={"width":1600,"height":1080},device_scale_factor=1,color_scheme="dark")
                     page.goto("http://127.0.0.1:8765",wait_until="domcontentloaded")
                     def ready(heading):
                         page.get_by_role("heading",name=heading,exact=True).wait_for(timeout=45000)
@@ -114,6 +114,17 @@ def capture(out,live=False):
                         ready("Competitive Command Centre" if name=="Command Centre" else name)
                         top()
                     ready("Competitive Command Centre")
+                    if not live:
+                        chart=page.locator(".js-plotly-plot").first
+                        chart.wait_for(timeout=20000)
+                        style=chart.evaluate("""gd=>({
+                          background:gd._fullLayout.plot_bgcolor,
+                          firstSize:gd.data[0].marker.size,
+                          rivals:gd.data.slice(1).map(t=>({size:t.marker.size,opacity:t.marker.opacity,width:t.marker.line.width}))
+                        })""")
+                        assert style["background"].lower()=="#141f30",style
+                        assert style["firstSize"]==36 and style["rivals"],style
+                        assert all(r["size"]==12 and r["opacity"]==1 and r["width"]>=1.5 for r in style["rivals"]),style
                     shot("01_Command_Centre")
                     for width,height in [(1280,800),(1920,1080)]:
                         page.set_viewport_size({"width":width,"height":height});page.wait_for_timeout(500)
@@ -191,7 +202,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.4 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.6 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

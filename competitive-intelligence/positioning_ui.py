@@ -3,6 +3,7 @@ import pandas as pd
 from excel_archive import download_analysis
 import plotly.express as px
 import plotly.graph_objects as go
+from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 from core import value
 from command_engine import direct_current, registry, ASSESS
 from advanced_ui import save_settings
@@ -22,7 +23,7 @@ def interval_chart(st,d,lower,upper,label,title):
     if d.empty: return
     f=go.Figure(go.Scatter(x=d[lower],y=d[label],mode="markers",error_x={"type":"data","symmetric":False,"array":(d[upper]-d[lower]).clip(lower=0),"arrayminus":[0]*len(d)}))
     f.update_layout(title=title,xaxis={"range":[0,1.04],"tickformat":".0%"},height=max(330,27*len(d)+100))
-    st.plotly_chart(f,use_container_width=True)
+    render_chart(st,f,use_container_width=True)
 
 def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
     st.header("Market Positioning Intelligence")
@@ -52,16 +53,14 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         d["Reference"]=d["Product ID"].map(lambda p:"AIT-VISTA" if p==VISTA else "Competitor")
         d["X lower"]=d[x+" lower"];d["X upper"]=d[x+" upper"];d["Y lower"]=d[y+" lower"];d["Y upper"]=d[y+" upper"]
         others=d[d["Product ID"]!=VISTA]
-        fig=px.scatter(others,x="X lower",y="Y lower",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data=["Company","X upper","Y upper"],error_x="X width",error_x_minus="Zero",error_y="Y width",error_y_minus="Zero")
+        fig=px.scatter(others,x="X lower",y="Y lower",color="Role",color_discrete_map=role_colors(),hover_name="Product",custom_data=["Product ID"],hover_data=["Company","X upper","Y upper"],error_x="X width",error_x_minus="Zero",error_y="Y width",error_y_minus="Zero")
         own=d[d["Product ID"]==VISTA].iloc[0]
         fig.add_trace(go.Scatter(x=[own["X lower"]],y=[own["Y lower"]],name=own.Product,mode="markers+text",text=[own.Product],textposition="bottom left",customdata=[[VISTA]],marker={"symbol":"star","size":20,"color":"#22b987"},error_x={"type":"data","symmetric":False,"array":[own["X width"]],"arrayminus":[0]},error_y={"type":"data","symmetric":False,"array":[own["Y width"]],"arrayminus":[0]},hovertemplate="AIT-VISTA reference<br>X lower %{x:.0%}<br>Y lower %{y:.0%}<extra></extra>"))
-        fig.data[-1].marker.size=36
-        fig.data[-1].marker.color="rgba(8,126,123,.3)"
-        fig.data[-1].marker.line={"color":"#087e7b","width":2}
+        fig.data[-1].marker=reference_marker(symbol="star")
         fig.data=(fig.data[-1],)+fig.data[:-1]
-        for tr in fig.data[1:]:tr.update(marker={"size":12,"line":{"color":"white","width":1}})
+        for tr in fig.data[1:]:tr.update(marker=rival_marker(tr.name))
         fig.update_layout(xaxis={"range":[-.03,1.08],"tickformat":".0%","title":x},yaxis={"range":[-.03,1.08],"tickformat":".0%","title":y},height=580)
-        event=st.plotly_chart(fig,use_container_width=True,on_select="rerun",selection_mode="points",key="pos-map")
+        event=render_chart(st,fig,use_container_width=True,on_select="rerun",selection_mode="points",key="pos-map")
         if own["X width"]>=.999 or own["Y width"]>=.999: st.info("AIT-VISTA has an unresolved axis. The star marks the lower interval endpoint, not a measured position.")
         st.caption("A star at 100% functional scope reflects the chosen internal criteria, not universal market leadership. Axes measure scope and ordinal commercial evidence, not measured performance.")
         points=event.selection.points if event is not None and hasattr(event,"selection") else []
@@ -81,17 +80,17 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         dims=[d for d in groups if d!=ALL] or [ALL]
         f=go.Figure()
         rows=[]
-        palette=px.colors.qualitative.Plotly
+        palette=chart_colors()
         for i,p in enumerate([VISTA]+selected):
             r=pos[pos["Product ID"]==p].iloc[0]
-            color="#22b987" if p==VISTA else palette[(i-1)%len(palette)]
+            color=tokens()["reference"] if p==VISTA else palette[(i-1)%len(palette)]
             low=[r[d+" lower"] for d in dims];high=[r[d+" upper"] for d in dims]
             # Draw separate closed bounds, never a made-up midpoint.
             f.add_trace(go.Scatterpolar(r=low+[low[0]],theta=dims+[dims[0]],mode="lines+markers",line={"color":color},legendgroup=p,name=names[p]+" lower"))
             f.add_trace(go.Scatterpolar(r=high+[high[0]],theta=dims+[dims[0]],mode="lines",line={"dash":"dot","color":color},legendgroup=p,name=names[p]+" upper"))
             rows.extend({"Product ID":p,"Product":names[p],"Dimension":d,"Lower":l,"Upper":h} for d,l,h in zip(dims,low,high))
         f.update_layout(polar={"radialaxis":{"range":[0,1],"tickformat":".0%"}},height=520)
-        st.plotly_chart(f,use_container_width=True)
+        render_chart(st,f,use_container_width=True)
         table(st,pd.DataFrame(rows),"capability-profile")
         st.caption("Solid = lower bound; dotted = upper bound. Dimensions are an analytical grouping, not an independent market-wide requirements standard.")
     elif view=="Competitive proximity":
@@ -112,7 +111,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
             candidates["Zero"]=0.
             fig=px.scatter(candidates,x="Similarity lower",y="Commercial readiness lower",color="Role",hover_name="Product",error_x="Proximity width",error_x_minus="Zero",error_y="Commercial width",error_y_minus="Zero",hover_data=["Similarity upper","Commercial readiness upper","Company"])
             fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%"},yaxis={"range":[0,1.05],"tickformat":".0%"},height=430)
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         st.caption("Similarity is 1 minus weighted absolute criterion distance. With an all-supported reference it equals scope coverage; it cannot reveal capabilities outside our criteria. Commercial substitution remains a provisional classification, not inferred from proximity.")
     elif view=="Company portfolios":
         axis=st.selectbox("Company positioning dimension",axes,key="pos-company-axis")
@@ -131,7 +130,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         st.subheader("Functional differentiation vs strongest product")
         f=go.Figure(go.Scatter(x=d["Delta lower"],y=d.Criterion,mode="markers",error_x={"type":"data","symmetric":False,"array":(d["Delta upper"]-d["Delta lower"]).clip(lower=0),"arrayminus":[0]*len(d)},customdata=d[["Finding"]],hovertemplate="%{y}<br>%{customdata[0]}<br>Lower %{x:.0%}<extra></extra>"))
         f.add_vline(x=0,line_dash="dash");f.update_layout(xaxis={"range":[-1.05,1.05],"tickformat":".0%","title":"AIT-VISTA minus strongest competitor"},height=max(400,25*len(d)+100))
-        st.plotly_chart(f,use_container_width=True)
+        render_chart(st,f,use_container_width=True)
         st.subheader("Rarity versus customer importance")
         mapped=d[d["Customer importance"]!="Unknown"].copy()
         if mapped.empty: st.info("Customer importance is not available in this workbook. No points are invented; enter optional estimates in Methodology & settings or use the existing other 5PACE sources after coordination.")
@@ -140,7 +139,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
             mapped["Rarity width"]=mapped["Rarity upper"]-mapped["Rarity lower"];mapped["Zero"]=0.
             fig=px.scatter(mapped,x="Rarity lower",y="Importance",color="Finding",hover_name="Criterion",error_x="Rarity width",error_x_minus="Zero")
             fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%"},yaxis={"tickvals":[1,2,3],"ticktext":["Low","Medium","High"],"range":[.5,3.5]})
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         table(st,d,"advantage-portfolio")
         st.caption("Rarity is an interval over distinct applicable product families. No competitor evidence does not establish advantage. Customer importance is an optional team estimate, not verified demand or performance.")
     elif view=="Evidence sensitivity":
@@ -152,7 +151,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
             detail["Product"]=detail["Product ID"].map(names)
             f=go.Figure(go.Scatter(x=summary["Best possible rank"],y=summary.Product,mode="markers",error_x={"type":"data","symmetric":False,"array":summary["Worst possible rank"]-summary["Best possible rank"],"arrayminus":[0]*len(summary)}))
             f.update_layout(xaxis_title="Possible proximity rank across sampled scenarios (1 = closest)",height=max(400,22*len(summary)+100))
-            st.plotly_chart(f,use_container_width=True)
+            render_chart(st,f,use_container_width=True)
             table(st,summary,"sensitivity-summary")
             with st.expander("Individual evidence and scoring scenarios"): table(st,detail,"sensitivity-detail")
     elif view=="Workflow differentiation":
@@ -165,7 +164,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         stages["Zero"]=0.
         fig=px.bar(stages,x="Stage",y="Lower",color="Product",barmode="group",error_y="Uncertainty",error_y_minus="Zero",hover_data=["Upper","Criterion IDs"])
         fig.update_layout(yaxis={"range":[0,1.05],"tickformat":".0%","title":"Stage criterion coverage"},height=450)
-        st.plotly_chart(fig,use_container_width=True)
+        render_chart(st,fig,use_container_width=True)
         table(st,stages,"workflow-stages")
         table(st,bottleneck,"workflow-bottlenecks")
         context=workflow_context(lo.loc[[VISTA]+chosen],hi.loc[[VISTA]+chosen],tax,weights)

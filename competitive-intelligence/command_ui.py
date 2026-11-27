@@ -3,6 +3,7 @@ import pandas as pd
 from excel_archive import download_analysis
 import plotly.express as px
 import plotly.graph_objects as go
+from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 from core import value, connect, read_snapshot
 from competitive_roles import classify, family_watchlist
 from advanced_ui import save_settings
@@ -23,7 +24,7 @@ def intervals(st,df,lower,upper,label,axis):
     if d.empty: return
     fig=go.Figure(go.Scatter(x=d[lower],y=d[label],mode="markers",error_x={"type":"data","symmetric":False,"array":(d[upper]-d[lower]).clip(lower=0),"arrayminus":[0]*len(d)},marker={"size":9}))
     fig.update_layout(xaxis={"range":[0,1],"tickformat":".0%","title":axis},height=max(330,28*len(d)+100),margin={"l":10,"r":20})
-    st.plotly_chart(fig,use_container_width=True)
+    render_chart(st,fig,use_container_width=True)
 
 def command_page(st,data,cfg,demo_mode,snapshots,current):
     st.header("Competitive Command Centre")
@@ -98,11 +99,11 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         d["Market uncertainty"]=(d["Market upper"]-d["Market lower"]).clip(lower=0)
         if not d.empty:
             d["Zero"]=0.
-            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Analytical role",symbol="Commercial status",hover_name="Product",custom_data=["Product ID"],hover_data=["Company","Overlap upper","Market upper","Known weight","Space relevance","Why watch","Classification basis","Family ID"],error_x="Overlap uncertainty",error_x_minus="Zero",error_y="Market uncertainty",error_y_minus="Zero")
+            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Analytical role",color_discrete_map=role_colors(),symbol="Commercial status",hover_name="Product",custom_data=["Product ID"],hover_data=["Company","Overlap upper","Market upper","Known weight","Space relevance","Why watch","Classification basis","Family ID"],error_x="Overlap uncertainty",error_x_minus="Zero",error_y="Market uncertainty",error_y_minus="Zero")
             fig.update_traces(marker={"size":10})
             fig.add_vline(x=.5,line_dash="dot");fig.add_hline(y=.5,line_dash="dot")
             fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%","title":"Functional scope overlap (lower bound + uncertainty)"},yaxis={"range":[0,1.05],"tickformat":".0%","title":"Commercial / space / adoption evidence (lower + uncertainty)"},height=550)
-            event=st.plotly_chart(fig,use_container_width=True,on_select="rerun",selection_mode="points",key="cmd-landscape")
+            event=render_chart(st,fig,use_container_width=True,on_select="rerun",selection_mode="points",key="cmd-landscape")
             selected=event.selection.points if event is not None and hasattr(event,"selection") else []
             clicked=selected[0].get("customdata",[]) if selected else []
             chosen_pid=clicked[0] if clicked and clicked[0] in ids else None
@@ -125,7 +126,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
             fig=go.Figure(go.Bar(x=candidate["Existing positive verdicts"],y=candidate["Criterion ID"],orientation="h",name="Observed positive verdicts",customdata=candidate[["Criterion","Assessment"]],hovertemplate="%{customdata[0]}<br>%{customdata[1]}<br>Positive: %{x:.0%}<extra></extra>"))
             fig.add_trace(go.Bar(x=candidate["Unresolved share"],y=candidate["Criterion ID"],orientation="h",name="Unresolved (possible overlap)",marker={"color":"#828b99"},hovertemplate="Unresolved: %{x:.0%}<extra></extra>"))
             fig.update_layout(barmode="stack",xaxis={"range":[0,1],"tickformat":".0%","title":"Share of selected applicable product families"},height=max(420,24*len(candidate)+100),title="Existing competition vs unresolved differentiation hypotheses")
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         table(st,av[["Criterion","AIT-VISTA","Assessment","Existing full support","Existing partial support","Unresolved","Demand","Customer importance (team estimate)","Operational performance comparison"]],"position-summary")
         st.subheader("Next decisions")
         actions=av[av["AIT-VISTA"]!="Not applicable"].copy()
@@ -135,13 +136,13 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         actions["Review priority"]=actions["Importance"]*actions["Decision urgency"]
         actions=actions.sort_values(["Review priority","Criterion ID"],ascending=[False,True])
         if not actions.empty:
-            st.plotly_chart(px.bar(actions.head(12).sort_values("Review priority"),x="Review priority",y="Criterion ID",color="Next decision",orientation="h",hover_name="Criterion",hover_data=["Assessment","Importance"],title="Decision review priority — heuristic, not implementation effort"),use_container_width=True)
+            render_chart(st,px.bar(actions.head(12).sort_values("Review priority"),x="Review priority",y="Criterion ID",color="Next decision",orientation="h",hover_name="Criterion",hover_data=["Assessment","Importance"],title="Decision review priority — heuristic, not implementation effort"),use_container_width=True)
         table(st,actions[["Criterion ID","Criterion","Assessment","Next decision","Demand","Review priority"]],"next-decisions")
         actual=av.dropna(subset=["Delta lower","Delta upper"]).copy()
         if not actual.empty:
             fig=go.Figure(go.Scatter(x=actual["Delta lower"],y=actual.Criterion,mode="markers",error_x={"type":"data","symmetric":False,"array":actual["Delta upper"]-actual["Delta lower"],"arrayminus":[0]*len(actual)}))
             fig.add_vline(x=0,line_dash="dash");fig.update_layout(xaxis={"range":[-1,1],"title":"AIT-VISTA minus best competitor (interval)"},height=max(380,28*len(actual)+100))
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         else: st.info("No applicable current comparison; select As-Is and an applicable competitor cohort.")
     elif view=="Benchmark & competitor profile":
         if not ids: return
@@ -158,7 +159,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         for i,c in enumerate(colors): scale.extend([[i/len(colors),c],[(i+1)/len(colors),c]])
         fig=go.Figure(go.Heatmap(z=bm.apply(lambda s:s.map(code)).to_numpy(),x=list(bm.columns),y=[names.get(p,p) for p in bm.index],text=bm.to_numpy(),zmin=-.5,zmax=len(colors)-.5,colorscale=scale,colorbar={"tickmode":"array","tickvals":list(code.values()),"ticktext":statuses},hovertemplate="%{y}<br>%{x}<br>%{text}<extra></extra>"))
         fig.update_layout(height=max(380,40*len(bm)+130))
-        st.plotly_chart(fig,use_container_width=True)
+        render_chart(st,fig,use_container_width=True)
         table(st,bm.rename(index=names,columns=labels).rename_axis("Product").reset_index(),"direct-matrix")
         pid=st.selectbox("Competitor profile",chosen,format_func=names.get,key="cmd-pid")
         st.write({k:value(products[pid],k) for k in ["Competition Type","Strategic Priority","Primary Use Case","Target Customers","Target Industries","Commercial Status","Deployment Architecture","Space Industry Applicability","Space Deployment Evidence","Related Observation IDs","Product URL","Notes"]})
@@ -218,7 +219,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         else:
             fig=px.scatter(d,x="Effort level",y="Value level",color="Delivery option",text="Criterion ID",hover_name="Criterion",hover_data=["Maturity","Trade-off"])
             fig.update_layout(xaxis={"range":[.5,3.5],"tickvals":[1,2,3],"ticktext":["Low","Medium","High"],"title":"Development effort"},yaxis={"range":[.5,3.5],"tickvals":[1,2,3],"ticktext":["Low","Medium","High"],"title":"Strategic value"},height=450)
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         table(st,df,"baseline-roadmap")
         st.subheader("Engineering traceability")
         table(st,mappings(data),"criterion-function-trace")
@@ -236,7 +237,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
                 if changes.empty: st.info("No direct assessment changes.")
                 else:
                     table(st,changes,"comparison-changes")
-                    st.plotly_chart(px.bar(changes.groupby(["Product ID","Interpretation"]).size().reset_index(name="Changes"),x="Changes",y="Product ID",color="Interpretation",orientation="h"),use_container_width=True)
+                    render_chart(st,px.bar(changes.groupby(["Product ID","Interpretation"]).size().reset_index(name="Changes"),x="Changes",y="Product ID",color="Interpretation",orientation="h"),use_container_width=True)
         else: st.info("A second distinct snapshot is needed to compare recorded changes.")
         st.subheader("Recorded overlap evolution")
         if not demo_mode and len(snapshots)>1 and scope and ids:
@@ -253,7 +254,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
                         fig.add_trace(go.Scatter(x=g.Snapshot,y=g.Lower,mode="lines+markers",name=names.get(p,p)+" lower",customdata=g[["Upper","Known weight"]],hovertemplate="Lower %{y:.0%}<br>Upper %{customdata[0]:.0%}<br>Determinate %{customdata[1]:.0%}<extra></extra>"))
                         fig.add_trace(go.Scatter(x=g.Snapshot,y=g.Upper,mode="lines",line={"dash":"dot"},name=names.get(p,p)+" upper"))
                     fig.update_layout(yaxis={"range":[0,1],"tickformat":".0%","title":"Recorded functional overlap interval"},height=420)
-                    st.plotly_chart(fig,use_container_width=True)
+                    render_chart(st,fig,use_container_width=True)
                     table(st,evolution,"comparison-evolution")
                 st.caption("Fixed selected criterion set and weights. Not applicable treated as unresolved here for a stable denominator. Changes in recorded evidence do not establish product evolution.")
         else: st.info("At least two distinct snapshots and a selected baseline scope are required.")

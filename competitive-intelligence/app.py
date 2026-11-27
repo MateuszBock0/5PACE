@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 import streamlit as st
 import networkx as nx
 from core import ROOT, config, connect, read_snapshot, history, state, restore, diff, records, value, due, digest, validate, canonical
@@ -26,7 +27,7 @@ from advanced_ui import (commercial_page, product_page, strategic_page, evolutio
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.markdown("**5PACE / INTELLIGENCE**")
-st.caption("v1.4.5-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.4.6-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -147,7 +148,7 @@ if page=="Overview":
         left,right=st.columns(2)
         for c,field,title in [(left,"Status","Availability"),(right,"Evidence Level","Strongest recorded evidence per pair")]:
             counts=filtered[field].value_counts().rename_axis(field).reset_index(name="Count")
-            c.plotly_chart(px.bar(counts,x="Count",y=field,orientation="h",title=title),use_container_width=True)
+            render_chart(c,px.bar(counts,x="Count",y=field,orientation="h",title=title),use_container_width=True)
     st.subheader("Latest recorded observations")
     obs=frame(data,"Observations")
     if "Date added (ISO)" in obs: obs=obs.sort_values("Date added (ISO)",ascending=False)
@@ -179,7 +180,7 @@ elif page=="Capability matrix":
         for i,c in enumerate(colors): scale.extend([[i/len(colors),c],[(i+1)/len(colors),c]])
         fig=go.Figure(go.Heatmap(z=m.apply(lambda s:s.map(code)).to_numpy(),x=[cnames[c] for c in m.columns],y=[pnames[p] for p in m.index],zmin=-.5,zmax=len(colors)-.5,colorscale=scale,text=m.to_numpy(),hovertemplate="%{y}<br>%{x}<br>%{text}<extra></extra>",colorbar={"tickmode":"array","tickvals":list(range(len(colors))),"ticktext":DISPLAY}))
         fig.update_layout(height=max(420,30*len(chosen)+180))
-        st.plotly_chart(fig,use_container_width=True)
+        render_chart(st,fig,use_container_width=True)
         show(m.rename(index=pnames,columns=cnames).rename_axis("Product").reset_index(),"capability_matrix")
         pid=st.selectbox("Inspect product",chosen,format_func=pnames.get)
         cid=st.selectbox("Inspect capability",selected_caps,format_func=cnames.get)
@@ -211,11 +212,11 @@ elif page=="Landscape & threats":
             color="Space Industry Applicability"
         else: color=None
         s["Uncertainty width"]=s["Upper"]-s["Lower"]
-        st.plotly_chart(px.scatter(s,x="Lower",y="Known weight",color=color,hover_name="Product",hover_data=["Upper"],range_x=[0,1],range_y=[0,1],title="Evidence-backed overlap vs assessed weight"),use_container_width=True)
+        render_chart(st,px.scatter(s,x="Lower",y="Known weight",color=color,hover_name="Product",hover_data=["Upper"],range_x=[0,1],range_y=[0,1],title="Evidence-backed overlap vs assessed weight"),use_container_width=True)
         plot=s.dropna(subset=["Lower"]).sort_values("Lower")
         fig=go.Figure(go.Scatter(x=plot["Lower"],y=plot["Product"],mode="markers",error_x={"type":"data","symmetric":False,"array":plot["Uncertainty width"],"arrayminus":[0]*len(plot)}))
         fig.update_layout(xaxis={"range":[0,1],"title":"Lower–upper overlap bounds"},height=max(380,len(plot)*23))
-        st.plotly_chart(fig,use_container_width=True)
+        render_chart(st,fig,use_container_width=True)
         show(s.sort_values("Lower",ascending=False),"threat_bounds")
         if st.button("Run weight sensitivity (250 scenarios)"):
             ss=sensitivity(mat[target],weights).merge(s[["Product ID","Product"]],on="Product ID",how="left")
@@ -240,7 +241,7 @@ elif page=="Knowledge graph":
                 nodes=[n for n,d in g.nodes(data=True) if d["kind"]==kind]
                 fig.add_trace(go.Scatter(x=[pos[n][0] for n in nodes],y=[pos[n][1] for n in nodes],mode="markers+text" if len(g)<40 else "markers",text=[g.nodes[n]["label"] for n in nodes],hovertext=nodes,hoverinfo="text",name=kind,textposition="top center",marker={"size":13}))
             fig.update_layout(height=650,xaxis={"visible":False},yaxis={"visible":False})
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         show(pd.DataFrame([{"Source":u,"Target":v,**d} for u,v,d in g.edges(data=True)]),"graph_edges")
     st.caption("Edges reflect documented capabilities or evidence references, not inferred commercial partnerships.")
 elif page=="Research gaps":
@@ -302,7 +303,7 @@ elif page=="History & evolution":
                     snap=read_snapshot(conn,h)
                     for name in ["Companies","Products","Capabilities","Capability Assessment","Deployments","Commercial Intelligence"]:
                         rows.append({"UTC":t,"Register":name,"Records":len(records(snap,name))})
-            st.plotly_chart(px.line(pd.DataFrame(rows),x="UTC",y="Records",color="Register",markers=True),use_container_width=True)
+            render_chart(st,px.line(pd.DataFrame(rows),x="UTC",y="Records",color="Register",markers=True),use_container_width=True)
             chosen=st.selectbox("Restore local snapshot", [r[0] for r in snapshots],format_func=lambda h:h[:12])
             if st.checkbox("I understand this changes the local view only") and st.button("Restore selected snapshot"):
                 with connect() as conn: restore(conn,chosen)
@@ -313,7 +314,7 @@ elif page=="History & evolution":
         if field in obs:
             dates=pd.to_datetime(obs[field],errors="coerce",utc=True)
             counts=dates.dropna().dt.strftime("%Y-%m-%d").value_counts().sort_index().rename_axis("Date").reset_index(name="Count")
-            if not counts.empty: st.plotly_chart(px.bar(counts,x="Date",y="Count",title=field),use_container_width=True)
+            if not counts.empty: render_chart(st,px.bar(counts,x="Date",y="Count",title=field),use_container_width=True)
 elif page=="Product intelligence":
     product_page(st,data,mat,pnames,cnames,cfg,show,demo_mode)
 elif page=="Strategic intelligence":

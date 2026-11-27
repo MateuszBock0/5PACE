@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 from core import ROOT,DATA,config,connect,store,read_snapshot,validate,records,value,digest
 from analytics import matrix
 from product_intelligence import mappings,criterion_matrix,function_profile,target_ids,source_rows,CRITERIA,FUNCTIONS,MATURITY
@@ -55,7 +56,7 @@ def commercial_page(st,data,mat,cnames,cfg,show):
     if out.empty: return
     fig=go.Figure(go.Scatter(x=out["Lower"],y=out["Product"],mode="markers",error_x={"type":"data","symmetric":False,"array":out["Uncertainty width"],"arrayminus":[0]*len(out)}))
     fig.update_layout(xaxis={"range":[0,1],"title":"Scenario lower–upper bound"},height=max(400,25*len(out)))
-    st.plotly_chart(fig,use_container_width=True)
+    render_chart(st,fig,use_container_width=True)
     show(out,"commercial_mcda")
     st.caption("A wide interval indicates insufficient evidence. Lower-bound order is not a definitive threat ranking.")
     if st.button("Compare criterion-weight scenarios"):
@@ -79,7 +80,7 @@ def evolution_panel(st,before,after,selected_caps,cnames,show):
         if not out.empty:
             fig=px.scatter(out,x="Baseline lower",y="Current lower",hover_name="Product ID",color="Jointly determinate",range_x=[0,1],range_y=[0,1],title="Change in recorded functional overlap")
             fig.add_shape(type="line",x0=0,y0=0,x1=1,y1=1,line={"dash":"dot"})
-            st.plotly_chart(fig,use_container_width=True)
+            render_chart(st,fig,use_container_width=True)
         st.caption("Common products and capabilities only. A positive change can reflect newly discovered evidence rather than a product release. Jointly determinate changes are reported separately.")
 
 def research_panel(st,data,cfg,show):

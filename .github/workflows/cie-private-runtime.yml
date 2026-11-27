@@ -1,9 +1,6 @@
 name: CIE public offline runtime
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/cie-private-runtime.yml'
-      - 'competitive-intelligence/**'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -22,4 +19,5 @@ jobs:
         with:
           name: cie-public-code-runtime
           path: runtime/
+          include-hidden-files: true
           retention-days: 3

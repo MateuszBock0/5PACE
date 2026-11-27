@@ -175,8 +175,10 @@ def explorer(st,data,cfg,rows):
     with cards[0]:
         with st.container(border=True):
             st.markdown("**Customers / cases**")
-            customers=list(dict.fromkeys(value(x,"Customer Organisation") for x in records["Deployments"] if value(x,"Customer Organisation")))
-            st.write(", ".join(customers) if customers else "No customer cases recorded.")
+            customers=list(dict.fromkeys(value(x,"Customer Organisation") for x in records["Deployments"] if value(x,"Customer Organisation") and value(x,"Deployment Status") in {"Documented implementation","Reported implementation"}))
+            st.write(", ".join(customers) if customers else "No customer implementation cases recorded.")
+            other=[x for x in records["Deployments"] if value(x,"Deployment Status") not in {"Documented implementation","Reported implementation"}]
+            if other:st.caption("Additional demonstration / other records: "+str(len(other))+" (see Deployments).")
             st.caption(value(p,"Target Customers") or "Target customer not recorded.")
     with cards[1]:
         with st.container(border=True):
@@ -340,7 +342,9 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
             with connect() as conn:before=read_snapshot(conn,old)
             if before:
                 ch=comparison_changes(before,data)
-                if ch.empty:st.info("No recorded direct assessment changes.")
+                if not ch.empty:
+                    ch=ch[(ch["Before"]!=ch["After"])|(ch["Evidence before"]!=ch["Evidence after"])]
+                if ch.empty:st.info("No material recorded verdict or evidence-level changes.")
                 else:
                     ch["Product"]=ch["Product ID"].map(lambda p:value(pro.get(p,{}),"Product Name"))
                     table(st,ch,"recorded-changes",True)
@@ -369,23 +373,32 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     f=priority_families(rows)
     stamp=next((x[1] for x in snapshots if x[0]==current),"Not captured")
     st.caption("Snapshot capture: "+("Synthetic demo (not stored)" if demo else stamp))
-    cards=st.columns(3)
-    groups=[("Closest visual rivals",f[f.Order==0],"Visual AIT candidates"),
-            ("Budget substitutes",f[f.Order==1],"Workflow / purchasing alternatives"),
-            ("Technology benchmarks",f[f.Order.isin([0,2])].sort_values(["Recorded overlap fraction","Technical or stronger"],ascending=False),"Recorded visual or cross-industry overlap")]
+    cards=st.columns(4)
+    visual=f[f.Order==0]
+    tech=f[f.Order.isin([0,2])].sort_values(["Recorded overlap fraction","Technical or stronger"],ascending=False)
+    target=visual[visual["Customer position"].isin(CUSTOMER_LANES[2:])]
+    lead=tech.head(1)
+    market=target[~target["Family ID"].isin(lead["Family ID"])]
+    groups=[("Visual technology benchmark",lead,"Highest recorded overlap in selected visual / adjacent roles"),
+            ("Market-facing visual candidates",market,"Recorded spacecraft target customers; adoption may be unresolved"),
+            ("Budget substitution candidates",f[f.Order==1],"Workflow / purchasing alternatives; same budget unconfirmed"),
+            ("Adjacent / emerging watch",f[f.Order.isin([2,3])],"Investigate market entry and unresolved classification")]
     for col,(title,g,caption) in zip(cards,groups):
         with col:
             with st.container(border=True):
                 st.caption(title)
                 st.markdown("**"+(" · ".join(g.Company.drop_duplicates().head(2)) if not g.empty else "Unresolved")+"**")
                 st.caption(caption)
+                if not g.empty:
+                    first=g.iloc[0]
+                    open_profile(st,first["Product ID"],first["Company ID"],"strategic-card-"+title)
     st.subheader("Technology × customer positioning")
     mapped=f[f.Order<3].head(10)
     render_map(st,data,mapped if not mapped.empty else f.head(8),"landing-map",True)
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")
-        items=pd.concat([g.head(2) for _,g,_ in groups]).drop_duplicates("Family ID").head(5)
+        items=pd.concat([g.head(2) for _,g,_ in groups]).drop_duplicates("Family ID").head(7)
         if items.empty:items=f.head(4)
         for _,r in items.iterrows():
             with st.container(border=True):

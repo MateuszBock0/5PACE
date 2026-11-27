@@ -18,3 +18,21 @@ def test_modes_and_importance():
     assert dataset_label({}, "Offline import","a","a")=="LOCAL IMPORTED SNAPSHOT"
     assert importance_lane({"command_profiles":{"c":{"customer_importance":"High"}}},"c")=="Unresolved"
     assert importance_lane({"command_profiles":{"c":{"customer_importance":"High","customer_importance_reference":"explicit reference"}}},"c")=="High"
+
+def test_chart_route_preserves_product_criterion_and_reference():
+    from founder_ui import chart_route
+    class UI:
+        session_state={}
+    d=comparison_fixture()
+    ui=UI()
+    ui.session_state={"plot":{"selection":{"points":[{"customdata":["DEMO-P2","CR1"]}]}}}
+    chart_route(ui,"plot",d,"criterion")
+    assert ui.session_state["founder_workspace"]=="Competitor Explorer"
+    assert ui.session_state["founder_company_pending"]=="DEMO-CO-2"
+    assert ui.session_state["founder_product_pending"]=="DEMO-P2"
+    assert ui.session_state["profile_criterion_pending"]=="CR1"
+    assert ui.session_state["profile_section_pending"]=="Compare"
+    ui.session_state={"plot":{"selection":{"points":[{"customdata":["DEMO-P1","DEMO-CO-1","Deployments","dep"]}]}}}
+    chart_route(ui,"plot",d,"signal")
+    assert ui.session_state["profile_reference_pending"]==("Deployments","dep")
+    assert ui.session_state["profile_section_pending"]=="Deployments"

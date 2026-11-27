@@ -39,7 +39,7 @@ def run():
             assert any(mode in c.value for c in app.caption),"Incorrect dataset indicator"
             rows=summaries(data);products=registry(data,"Products","Product ID")
             from founder import strategic_map_cohort,DEFAULT_MAP_SCOPE
-            expected={r["Product ID"] for _,r in rows.iterrows() if r["Customer position"] in {"Space AIT target segment","Space AIT implementation case"} or r["Functional overlap"] in {"Material recorded overlap","Broad recorded overlap"}}
+            expected={r["Product ID"] for _,r in rows.iterrows() if r["Recorded overlap fraction"]>=.6 or (r["Recorded overlap fraction"]>=.4 and r["Customer position"] in {"Space AIT target segment","Space AIT implementation case"})}
             assert set(strategic_map_cohort(rows)["Product ID"])==expected
             assert set(strategic_map_cohort(rows,"All products")["Product ID"])==set(products)
             companies=registry(data,"Companies","Company ID")

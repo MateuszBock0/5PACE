@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.7-rc1 — Unified 40% / 60% strategic cohort
+
+- Fixed eight-criterion recorded-overlap score and inclusive customer-evidence thresholds.
+- Shared default cohort, percentage maps, explicit coverage, Space Watch, custom selection and reset.
+- PDF scope and percentage map aligned; dark theme retained.
+
 ## 1.4.6-rc1 — Dark mode and visual contrast
 
 - Native dark theme, consistent chart palette and clearer outlined markers with stable role symbols.

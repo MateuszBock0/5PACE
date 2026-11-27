@@ -36,14 +36,14 @@ def sample():
             append("Observations",{"Observation ID":"DEMO-O"+str(i),"Company ID":cid,"Observation":"Illustrative customer, architecture or product information. Not real market evidence.","Date added (ISO)":"2026-11-27","Implication for AIT-VISTA":"Review the relevant workflow and deployment assumptions.","Source URL":"https://example.invalid/"})
         append("Deployments",{"Deployment ID":"DEMO-D"+str(i),"Product ID":p["Product ID"],"Customer Organisation":"Example Customer "+str(i),"Deployment Status":"Documented implementation","Deployment Date":"2026-11-20","Use Case":"Synthetic example deployment","Source URL":"https://example.invalid/","Evidence Limitations":"Fictitious fixture"})
         append("Commercial Intelligence",{"Commercial Record ID":"DEMO-M"+str(i),"Product ID":p["Product ID"],"Business Model":"Illustrative subscription","Subscription Cost":"100","Currency":"EUR","Price Basis":"Fictitious per month, not a real offer","Applicable Date":"2026-11-20","Source URL":"https://example.invalid/"})
-    crit=[("003","Physical configuration verification"),("004","Observed procedure verification"),("002","Automated AIT documentation"),("020","Fully local / offline operation"),("005","Passive AIT recording"),("008","Dynamic mechanism verification"),("022","Vendor-independent architecture"),("009","Digital procedure management"),("015","Non-visual measurement records")]
+    crit=[("003","Physical configuration verification"),("004","Observed procedure verification"),("002","Automated AIT documentation"),("020","Fully local / offline operation"),("005","Passive AIT recording"),("008","Dynamic mechanism verification"),("022","Vendor-independent architecture"),("009","Digital procedure management"),("015","Non-visual measurement records"),("023","Enterprise system integration")]
     ids=["AV-CR-"+i for i,_ in crit]
     d["AIT-VISTA Capabilities"]=normalize_sheet("AIT-VISTA Capabilities",[["Criterion ID","Product criterion","Type","Related market capability IDs"],*[[c,n,"Capability","DEMO-C1"] for c,(_,n) in zip(ids,crit)]])
     d["AIT-VISTA System Functions"]["rows"][0]["Comparison criterion IDs"]=ids[0]
-    verdicts=[["Supported","Supported","Supported","Supported","Partially supported","Partially supported","Partially supported","Supported","Unknown"],
-              ["Not assessed","Unknown","Supported","Partially supported","Partially supported","Not assessed","Not assessed","Supported","Supported"],
-              ["Partially supported","Partially supported","Unknown","Unknown","Supported","Not assessed","Partially supported","Announced","Not assessed"],
-              ["Supported","Not assessed","Partially supported","Unknown","Not assessed","Not assessed","Explicitly unsupported","Not assessed","Partially supported"]]
+    verdicts=[["Supported","Supported","Supported","Supported","Partially supported","Partially supported","Partially supported","Supported","Unknown","Supported"],
+              ["Not assessed","Unknown","Supported","Partially supported","Partially supported","Not assessed","Not assessed","Supported","Supported","Partially supported"],
+              ["Partially supported","Partially supported","Unknown","Unknown","Supported","Not assessed","Partially supported","Announced","Not assessed","Not assessed"],
+              ["Supported","Not assessed","Partially supported","Unknown","Not assessed","Not assessed","Explicitly unsupported","Not assessed","Partially supported","Not assessed"]]
     ledger=[]
     for k,vs in enumerate(verdicts,1):
         for j,s in enumerate(vs):
@@ -202,7 +202,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.6 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.7 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

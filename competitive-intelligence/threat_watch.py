@@ -70,21 +70,8 @@ def exposure(data,cfg,ids,cids=None):
     return result
 
 def threat_cohort(data,rows):
-    """Role-balanced selection; no named competitors or implicit portfolio merge."""
-    if rows.empty:return rows
-    f=rows.drop_duplicates("Family ID")
-    visual=f[f.Order==0].head(4)
-    budget=f[f.Order==1].head(1)
-    research=f[f.Role=="Research / emerging entrant"].copy()
-    if not research.empty:
-        ledger=direct_current(data)
-        # A research result establishing a bounded difference is useful even
-        # when a commercial product does not yet exist.
-        research["Research benchmark"]=research["Product ID"].map(lambda p:sum(r["status"]=="Explicitly unsupported" and EVIDENCE_RANK.get(r["evidence"],-1)>=3 for (q,c),r in ledger.items() if q==p))
-        research=research.sort_values(["Research benchmark","Recorded overlap fraction","Technical or stronger"],ascending=False).head(1)
-    result=pd.concat([visual,budget,research]).drop_duplicates("Product ID")
-    if len(result)<6:result=pd.concat([result,f[~f["Family ID"].isin(result["Family ID"])] ]).head(6)
-    return result
+    from founder import strategic_map_cohort
+    return strategic_map_cohort(rows)
 
 def spread_points(rows,x="X",y="Y",radius=.27,reference=None):
     """Display-only grid offsets, including exact co-location. Original axes unchanged."""

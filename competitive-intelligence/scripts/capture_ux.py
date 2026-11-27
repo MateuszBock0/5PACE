@@ -185,7 +185,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.2 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.4 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

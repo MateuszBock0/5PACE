@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.4-rc1 — Threat Watch and consolidated QA
+
+- Evidence-first strategic exposure, response categories and direct criterion routing.
+- Compact map/heatmap, reference hierarchy, wrapped evidence and grouped signals.
+- Synthetic PDF provenance isolation and native threat/exclusion report content.
+- Extend private acceptance to AI4AIT and all PDF types.
+
 ## 1.4.3-rc1 — QA & PDF reporting
 
 - Include research entrants in the default strategic map; explicit scope and exclusion reasons.

@@ -9,6 +9,7 @@ from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
 from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes,brief_criteria,WORKFLOW_EXAMPLES,search_companies,short_reason,relationship_lane,commercial_summary
 from excel_archive import download_analysis
 from founder import strategic_map_cohort,map_exclusions
+from threat_watch import exposure,spread_points,short_criterion,selected_criteria
 from decision import CUSTOMER_LANES,FUNCTION_LANES,company_brief,differentiation_questions,signals,importance_lane
 
 PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
@@ -44,16 +45,17 @@ def render_map(st,data,rows,key,compact=False):
     d=rows.copy()
     d["X"]=d["Functional overlap"].map(dict(zip(FUNCTION_LANES,range(4)))).astype(float)
     d["Y"]=d["Customer position"].map(dict(zip(CUSTOMER_LANES,range(4)))).astype(float)
-    for _,g in d.groupby(["X","Y"]):
-        for k,idx in enumerate(g.index):
-            d.loc[idx,"X"]+=(k-(len(g)-1)/2)*min(.17,.65/max(1,len(g)-1))
-    fig=px.scatter(d,x="X",y="Y",color="Role",text="Company",hover_name="Product",custom_data=["Product ID"],hover_data={"X":False,"Y":False,"Functional overlap":True,"Customer position":True,"Customer basis":True,"Procurement":True})
-    fig.update_traces(marker={"size":12},textposition="top center")
-    fig.add_trace(go.Scatter(x=[3],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="bottom right",name="AIT-VISTA declared target",customdata=[[VISTA]],marker={"symbol":"star","size":19,"color":"#087e7b"},hovertemplate="Declared functional scope and target segment; not evidence of adoption<extra></extra>"))
+    d=spread_points(d,reference=(3,2))
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=[3],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="top center",name="AIT-VISTA reference",customdata=[[VISTA]],marker={"symbol":"circle","size":36,"color":"rgba(8,126,123,.18)","line":{"color":"#087e7b","width":2}},hovertemplate="Declared scope / target; not market share<extra></extra>"))
+    rivals=px.scatter(d,x="Display X",y="Display Y",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data={"Display X":False,"Display Y":False,"Functional overlap":True,"Customer position":True,"Customer basis":True,"Procurement":True})
+    for tr in rivals.data:
+        tr.update(marker={"size":12,"line":{"color":"#fff","width":1.5}})
+        fig.add_trace(tr)
     fig.add_hrect(y0=-.45,y1=.45,fillcolor="#e9eef2",line_width=0,layer="below")
-    fig.update_layout(height=390 if compact else 490,legend={"orientation":"h","y":-0.27},xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved / no positive record","Some","Material","Broad"],"range":[-.65,3.65],"title":"Recorded functional overlap"},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":CUSTOMER_LANES,"range":[-.5,3.5],"title":"Customer-segment evidence"},margin={"t":15,"b":95})
+    fig.update_layout(height=340 if compact else 465,legend={"orientation":"h","y":-0.27,"font":{"size":10}},xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Some","Material","Broad"],"range":[-.5,3.5],"title":"Recorded functional overlap","automargin":True},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Adjacent sector","Space AIT target","Space AIT case"],"range":[-.5,3.5],"title":"Customer evidence","automargin":True},margin={"t":12,"b":95,"l":15,"r":15})
     st.plotly_chart(fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"product"),selection_mode="points")
-    st.caption("Select a product to open its profile. Customer-segment evidence is independent of functional overlap; shared procurement remains unresolved. Positions are categories, not scores or market share.")
+    st.caption("Select a product to open its profile. Customer-segment evidence is independent of functional overlap; shared procurement remains unresolved. Positions are categories, not scores or market share. Display-only offsets separate co-located products; full names and categories appear on hover. Marker size is visual emphasis.")
 
 def open_profile(st,pid,cid,key):
     st.button("Open profile",key="open-"+key,on_click=navigate,args=(st,pid,cid))
@@ -89,7 +91,16 @@ def detail(st,data,pid,cid,key):
     st.markdown("**"+value(criterion,"Product criterion")+" — "+verdict+"**")
     if value(criterion,"Type"): st.caption("Criterion type: "+value(criterion,"Type"))
     if not active: st.caption("No direct assessment. This is not evidence of non-support.")
-    else: source_records(st,active,key+"-active")
+    else:
+        for i,r in enumerate(active):
+            with st.container(border=True):
+                st.caption(" · ".join(value(r,k) for k in ["Comparison ID","Evidence level","Assessment date"] if value(r,k)))
+                st.write(value(r,"Assessment rationale") or "Rationale not recorded.")
+                st.caption("Limitations: "+(value(r,"Limitations") or "Not recorded"))
+                for j,u in enumerate(value(r,"Source URLs").replace("\n",";").split(";")):
+                    u=u.strip()
+                    if u.startswith(("https://","http://")) and not any(ch.isspace() for ch in u):st.link_button("Source: "+u.split("/")[2],u)
+        with st.expander("Original active records"):source_records(st,active,key+"-active")
     with st.expander("Assessment history / superseded evidence"):
         source_records(st,history,key+"-history")
 
@@ -104,27 +115,27 @@ def heatmap(st,data,cfg,rows,key,ids=None,stage_labels=None):
     states=["Explicitly unsupported","Unassessed","Unknown","Disputed","Not applicable","Announced","Partially supported","Supported"]
     colors=["#f3d5d5","#e9eef2","#c8d6e3","#e5d6ef","#d9dce1","#dbe5f9","#f8e8cd","#d9eeea"]
     code={v:i for i,v in enumerate(states)}
-    labels=[(stage_labels.get(c,"")+" · " if stage_labels and c in stage_labels else "")+value(criteria[c],"Product criterion") for c in ids]
+    labels=[stage_labels.get(c,short_criterion(c,value(criteria[c],"Product criterion"))) if stage_labels else short_criterion(c,value(criteria[c],"Product criterion")) for c in ids]
     mat.loc[VISTA]=[profile(cfg,c,"As-Is") for c in ids]
     mat=mat.loc[[VISTA]+ps]
-    marks={"Supported":"Supported","Partially supported":"Partial","Explicitly unsupported":"Unsupported","Unassessed":"Not assessed","Unknown":"Unknown","Announced":"Announced","Disputed":"Disputed","Not applicable":"N/A"}
+    marks={"Supported":"Full","Partially supported":"Partial","Explicitly unsupported":"No","Unassessed":"—","Unknown":"?","Announced":"A","Disputed":"!","Not applicable":"N/A"}
     # Scatter-square heatmap enables native point selection and evidence drill-down.
     cells=[(j,i,p,c,mat.loc[p,c]) for i,c in enumerate(ids) for j,p in enumerate([VISTA]+ps)]
     current_labels=["AIT-VISTA"]+[names[p] for p in ps]
     fig=go.Figure(go.Scatter(x=[v[0] for v in cells],y=[v[1] for v in cells],mode="markers+text",
         marker={"symbol":"square","size":36,"opacity":0.01},
         text=[marks.get(v[4],"Unknown") for v in cells],textfont={"color":"#26394b","size":12},textposition="middle center",
-        customdata=[[v[2],v[3],v[4],current_labels[v[0]],labels[v[1]]] for v in cells],
+        customdata=[[v[2],v[3],v[4],current_labels[v[0]],value(criteria[v[3]],"Product criterion")] for v in cells],
         hovertemplate="%{customdata[3]}<br>%{customdata[4]}<br>%{customdata[2]}<extra></extra>"))
     for j,i,p,c,s in cells:
         fig.add_shape(type="rect",x0=j-.46,x1=j+.46,y0=i-.38,y1=i+.38,fillcolor=colors[code.get(s,1)],line={"width":0},layer="below")
-    fig.update_layout(height=max(320,40*len(ids)+100),plot_bgcolor="#ffffff",paper_bgcolor="#ffffff",xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":current_labels,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
+    fig.update_layout(height=max(320,40*len(ids)+100),plot_bgcolor="#ffffff",paper_bgcolor="#ffffff",xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":[n if len(n)<=18 else n[:15]+"…" for n in current_labels],"tickangle":-30,"automargin":True,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"automargin":True,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
     chartkey="heat-"+key
     st.plotly_chart(fig,use_container_width=True,key=chartkey,on_select=lambda:chart_route(st,chartkey,data,"criterion"),selection_mode="points")
     pc=ps[0] if key=="profile" else None
     pending=st.session_state.pop("profile_criterion_pending",None) if key=="profile" else None
     cc=pending if pending in ids else None
-    st.caption("Select a cell to inspect evidence. Unknown = investigated but inconclusive; Not assessed = no direct record; Disputed = conflicting active records. Unsupported requires explicit evidence. Vendor claims remain visible.")
+    st.caption("Full = Supported · Partial = Partially supported · No = explicitly unsupported · ? = Unknown · — = Not assessed · ! = Disputed · A = Announced. Select a cell for full criterion, source and evidence. Vendor claims remain visible.")
     p=pc if key=="profile" else select_product(st,rows,key+"-profile","Inspect comparison product",pc)
     ck="heat-c-"+key
     if cc:st.session_state[ck]=cc
@@ -270,7 +281,8 @@ def positioning(st,data,cfg,rows):
     criteria=registry(data,CRITERIA,"Criterion ID")
     stages={c:label for label,c in WORKFLOW_EXAMPLES if c in criteria}
     if stages:
-        heatmap(st,data,cfg,d,"workflow",list(stages),stage_labels=stages)
+        workflow_ids=st.multiselect("Workflow products",ids,default=ids[:6],format_func=names.get,key="workflow-products")
+        heatmap(st,data,cfg,d[d["Product ID"].isin(workflow_ids)],"workflow",list(stages),stage_labels=stages)
         st.caption("Selected criterion examples by workflow stage, not proof of complete or integrated stage coverage.")
     else:
         st.info("Workflow example criteria are absent in this snapshot. Open Advanced Analytics for mapped stage coverage.")
@@ -280,7 +292,9 @@ def advantage(st,data,cfg,rows):
     if rows.empty:return
     f=priority_families(rows)
     candidates=f[f.Order<4]
-    default=(candidates if not candidates.empty else f).head(4)["Product ID"].tolist()
+    primary=(candidates if not candidates.empty else f).head(5)
+    research=f[f.Role=="Research / emerging entrant"].head(1)
+    default=pd.concat([primary,research]).drop_duplicates("Product ID")["Product ID"].tolist()
     names=rows.set_index("Product ID").Product.to_dict()
     ids=st.multiselect("Competitors to benchmark",list(names),default=default,format_func=names.get,key="founder-adv-products")
     selected=rows[rows["Product ID"].isin(ids)]
@@ -293,6 +307,8 @@ def advantage(st,data,cfg,rows):
     order=st.selectbox("Criterion order",["Strategic order","Name"],key="adv-sort")
     if order=="Name":cids=sorted(cids,key=lambda c:value(registry(data,CRITERIA,"Criterion ID")[c],"Product criterion"))
     heatmap(st,data,cfg,selected,"advantage",cids)
+    st.subheader("Response priority map")
+    response_view(st,data,cfg,selected,"adv-response")
     st.subheader("Differentiation portfolio")
     d=advantage_summary(data,cfg,ids)
     if d.empty:st.info("No comparable evidence.");return
@@ -371,6 +387,52 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
             st.download_button("Export complete research queue CSV",q.to_csv(index=False).encode(),file_name="priority-research.csv",key="founder-research-csv")
             select_product(st,rows[rows["Product ID"].isin(q.head(15)["Product ID"])],"research")
 
+def response_view(st,data,cfg,rows,key):
+    e=exposure(data,cfg,rows["Product ID"].tolist())
+    if e.empty:return
+    fig=px.scatter(e,x="Overlap",y="Importance",color="Action",hover_name="Criterion",custom_data=["Product ID","Criterion ID"],hover_data=["Product","Verdict","Evidence","Assessment date","Next decision"])
+    fig.update_traces(marker={"size":12,"line":{"width":1,"color":"white"}})
+    # Categorical positions may overlap; exact rows are also selectable below.
+    fig.update_layout(height=320,xaxis={"categoryorder":"array","categoryarray":["No positive record / unresolved","Partial recorded","Full recorded"]},yaxis={"categoryorder":"array","categoryarray":["Unresolved","Low","Medium","High"]},legend={"orientation":"h"})
+    st.plotly_chart(fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"criterion"),selection_mode="points")
+    st.caption("Unresolved importance is separate. React requires high provenance-bearing importance and technical-or-stronger positive evidence; Benchmark / Research / Monitor are action categories, not risk percentages.")
+    c=st.selectbox("Inspect response criterion",e["Criterion ID"].tolist(),format_func=e.set_index("Criterion ID")["Short criterion"].to_dict().get,key=key+"-criterion")
+    r=e[e["Criterion ID"]==c].iloc[0]
+    st.write(r.Action+" — "+r["Next decision"])
+    if r["Product ID"]:
+        p=registry(data,"Products","Product ID")[r["Product ID"]]
+        st.button("Open exact criterion evidence",key=key+"-open",on_click=navigate,args=(st,r["Product ID"],value(p,"Company ID"),"Competitor Explorer",c))
+    with st.expander("All response recommendations"):table(st,e[["Short criterion","Product","Verdict","Evidence","Importance","Action","Next decision"]],key+"-table",True)
+
+def threat_view(st,data,cfg,rows):
+    st.subheader("Threat Watch")
+    f=priority_families(rows)
+    # Select role-specific actual products, then inspect full cohort independently.
+    primary=f[f.Order<3].head(5)
+    research=f[f.Role=="Research / emerging entrant"]
+    if not research.empty:
+        # Prefer a research demonstrator with explicit strategic evidence.
+        research=research.sort_values(["Technical or stronger","Recorded overlap fraction"],ascending=False).head(1)
+    cohort=pd.concat([primary,research]).drop_duplicates("Product ID")
+    if cohort.empty:cohort=f.head(6)
+    names=rows.set_index("Product ID").Product.to_dict()
+    ids=st.multiselect("Threat Watch products",list(names),default=cohort["Product ID"].tolist(),format_func=names.get,key="threat-products")
+    selected=rows[rows["Product ID"].isin(ids)]
+    if selected.empty:return
+    e=exposure(data,cfg,ids)
+    if e.empty:return
+    for _,r in e[e.Verdict=="Supported"].head(3).iterrows():
+        p=registry(data,"Products","Product ID")[r["Product ID"]]
+        a,b=st.columns([4,1])
+        with a:
+            st.markdown("**"+r["Short criterion"]+" — "+r.Product+"**")
+            st.caption(r.Evidence+" · "+r["Assessment date"]+" · "+r["Comparison ID"])
+            st.write(r["Next decision"])
+        with b:st.button("Evidence",key="threat-"+r["Criterion ID"],on_click=navigate,args=(st,r["Product ID"],value(p,"Company ID"),"Competitor Explorer",r["Criterion ID"]))
+    st.caption("Full support means recorded functional parity candidate, not performance equivalence. Procurement substitutions are separate from technology overlap.")
+    heatmap(st,data,cfg,selected,"threat",list(registry(data,CRITERIA,"Criterion ID")) if st.checkbox("All 34 criteria",key="threat-all") else selected_criteria(data))
+    response_view(st,data,cfg,selected,"threat-response")
+
 def landing(st,data,cfg,rows,snapshots,current,demo):
     st.header("Competitive Command Centre")
     st.caption("What should 5PACE pay attention to today?")
@@ -396,6 +458,8 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
                 st.caption(caption)
                 if not g.empty:
                     first=g.iloc[0]
+                    st.caption("Uncertainty: "+("Commercial offer" if title.startswith("Research") else "Shared buyer / actual scope"))
+                    st.caption("Action: "+("Benchmark workflow" if title.startswith("Visual") else "Verify procurement" if title.startswith("Budget") else "Verify deployment and scope"))
                     open_profile(st,first["Product ID"],first["Company ID"],"strategic-card-"+title)
     st.subheader("Technology × customer positioning")
     scope=st.selectbox("Map scope",["Strategic + research","Commercial shortlist","Research & emerging","All products"],key="landing-map-scope")
@@ -409,6 +473,7 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         else:
             table(st,excluded[["Company","Product","Role","Reason not shown"]],"map-exclusions")
             select_product(st,excluded,"excluded-map")
+    threat_view(st,data,cfg,rows)
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")
@@ -428,19 +493,23 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         st.subheader("Recent strategic signals")
         t=signals(data)
         names=registry(data,"Companies","Company ID")
-        latest=t.head(4)
+        latest=t.drop_duplicates("Company ID").head(4)
         if latest.empty:st.caption("No observations recorded.")
         for i,(_,r) in enumerate(latest.iterrows()):
             with st.container(border=True):
                 st.markdown("**"+(value(names.get(r["Company ID"],{}),"Company Name") or "Observation")+"**")
                 st.caption(r.Date+" · "+r["Date basis"])
-                st.write(r.Development)
-                st.markdown("**Decision:** "+r["Strategic implication"])
+                st.write(r.Development[:210]+("…" if len(r.Development)>210 else ""))
+                st.caption("Decision: "+r["Strategic implication"][:190]+("…" if len(r["Strategic implication"])>190 else ""))
+                with st.expander("Full signal and source"):
+                    st.write(r.Development);st.write(r["Strategic implication"])
+                    u=r.Source.strip()
+                    if u.startswith(("https://","http://")) and not any(ch.isspace() for ch in u):st.link_button("Source: "+u.split("/")[2],u)
                 if r["Company ID"] in names:st.button("Open profile",key="news-"+str(i),on_click=navigate,args=(st,r["Product ID"] or None,r["Company ID"],"Competitor Explorer",None,r.Register,r.Reference))
         st.button("Intelligence Monitor",on_click=navigate,args=(st,None,None,"Intelligence Monitor"),key="landing-monitor")
     st.caption("Qualitative review order, not a calibrated threat score. Full rationale, source dates and unresolved questions are in each profile.")
     st.subheader("Where we may differentiate")
-    families=f[f.Order<3]["Family ID"].tolist()
+    families=f[(f.Order<3)|(f.Role=="Research / emerging entrant")]["Family ID"].tolist()
     candidates=rows[rows["Family ID"].isin(families)]["Product ID"].tolist()
     if candidates and registry(data,CRITERIA,"Criterion ID"):
         d=advantage_summary(data,cfg,candidates)

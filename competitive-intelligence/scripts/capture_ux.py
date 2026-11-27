@@ -118,10 +118,13 @@ def capture(out,live=False):
                     def map_point(pid,criterion=None,plot_index=0):
                         plot=page.locator(".js-plotly-plot").nth(plot_index)
                         plot.scroll_into_view_if_needed()
-                        xy=plot.evaluate("""(gd,args)=>{for(const tr of gd.data){for(let i=0;i<(tr.customdata||[]).length;i++){
+                        xy=plot.evaluate("""(gd,args)=>{for(let ti=0;ti<gd.data.length;ti++){const tr=gd.data[ti];for(let i=0;i<(tr.customdata||[]).length;i++){
                           const d=tr.customdata[i];if(d[0]===args[0] && (args[1]===null||d[1]===args[1])){
+                            const pt=(gd.calcdata[ti]||[]).find(p=>p.i===i)||(gd.calcdata[ti]||[])[i];
+                            if(!pt)return null;
                             const r=gd.getBoundingClientRect(),x=gd._fullLayout.xaxis,y=gd._fullLayout.yaxis;
-                            return [r.x+x._offset+x.l2p(tr.x[i]),r.y+y._offset+y.l2p(tr.y[i])];
+                            const xy=[r.x+x._offset+x.l2p(pt.x),r.y+y._offset+y.l2p(pt.y)];
+                            return xy.every(Number.isFinite)?xy:null;
                           }}}return null;}""",[pid,criterion])
                         if xy is None:raise RuntimeError("Requested chart point not present: "+pid)
                         page.mouse.click(*xy)
@@ -169,7 +172,6 @@ def capture(out,live=False):
                     if not live:
                         map_point("DEMO-P1","AV-CR-003")
                         ready("Competitor Explorer")
-                        page.get_by_text("Automated physical configuration verification — Supported",exact=False).count()
                         page.get_by_text("Physical configuration verification — Supported",exact=False).wait_for(timeout=15000)
                         nav("Competitive Advantage")
                     section("Differentiation portfolio")

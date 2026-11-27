@@ -172,7 +172,7 @@ def capture(out,live=False):
                     if not live:
                         map_point("DEMO-P1","AV-CR-003")
                         ready("Competitor Explorer")
-                        page.get_by_text("Physical configuration verification — Supported",exact=False).wait_for(timeout=15000)
+                        page.get_by_text("Physical configuration verification — Supported",exact=True).wait_for(timeout=15000)
                         nav("Competitive Advantage")
                     section("Differentiation portfolio")
                     shot("07_Advantage_Portfolio")

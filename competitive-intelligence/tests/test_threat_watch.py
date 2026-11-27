@@ -20,3 +20,14 @@ def test_exposure_does_not_treat_missing_as_absence():
     d=comparison_fixture()
     e=exposure(d,{},["missing"]).iloc[0]
     assert e.Verdict=="Unresolved" and e.Action=="Research" and e.Importance=="Unresolved"
+
+def test_record_specific_evidence_level():
+    import copy
+    d=comparison_fixture()
+    r=d["Comparison Assessment"]["rows"][0]
+    r["Evidence level"]="Vendor claim"
+    other=copy.deepcopy(r);other["Comparison ID"]="CMP-STRONG";other["Evidence level"]="Official technical documentation"
+    d["Comparison Assessment"]["rows"].append(other)
+    e=exposure(d,{},[r["Product ID"]],[r["Criterion ID"]]).iloc[0]
+    assert e["Comparison ID"]=="CMP-STRONG"
+    assert e.Evidence=="Official technical documentation"

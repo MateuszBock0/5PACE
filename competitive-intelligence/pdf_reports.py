@@ -3,7 +3,7 @@ from datetime import datetime,timezone
 from io import BytesIO
 from pathlib import Path
 import os, re
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape,quoteattr
 import pandas as pd
 import reportlab
 from reportlab.lib import colors
@@ -65,7 +65,15 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         "head":ParagraphStyle("head",fontName=BOLD,fontSize=8,leading=10,textColor=colors.white,splitLongWords=True),
     }
     story=[]
-    def p(v,style="body"):return Paragraph(escape(text(v)).replace("\n","<br/>"),styles[style])
+    def p(v,style="body"):
+        raw=text(v);parts=[];last=0
+        for m in re.finditer(r'https?://[^\s<>]+',raw):
+            parts.append(escape(raw[last:m.start()]))
+            url=m.group(0).rstrip(".,;)")
+            parts.append("<link href="+quoteattr(url)+" color=\"#087E7B\">"+escape(url)+"</link>"+escape(m.group(0)[len(url):]))
+            last=m.end()
+        parts.append(escape(raw[last:]))
+        return Paragraph("".join(parts).replace("\n","<br/>"),styles[style])
     def add(v,style="body"):story.append(p(v,style))
     def heading(v):add(v,"h")
     def table(headers,values,ratios=None,status_cols=()):
@@ -87,6 +95,18 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         heading("Threat Watch and response priorities")
         e=exposure(data,cfg,ids)
         if not e.empty:
+            xs=["No positive record / unresolved","Partial recorded","Full recorded"];ys=["Unresolved","Low","Medium","High"]
+            dr=Drawing(width,164);left=75;bottom=27;cw=(width-left-6)/3;ch=30
+            for i,lab in enumerate(ys):
+                dr.add(String(0,bottom+i*ch+12,lab,fontName=FONT,fontSize=8,fillColor=NAVY))
+                for j in range(3):dr.add(Rect(left+j*cw,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
+            for j,lab in enumerate(["Unresolved overlap","Partial support","Full support"]):
+                dr.add(String(left+(j+.5)*cw,10,lab,fontName=FONT,fontSize=8,textAnchor="middle",fillColor=NAVY))
+            for (x,y),g in e.groupby(["Overlap","Importance"]):
+                if x not in xs or y not in ys:continue
+                dr.add(String(left+(xs.index(x)+.5)*cw,bottom+ys.index(y)*ch+12,str(len(g))+" criteria",fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=TEAL))
+            story.append(dr)
+            add("Response map: customer importance by recorded overlap. Counts group criteria in the same category; exact action and evidence are listed below.","small")
             table(["Criterion / action","Product / verdict","Evidence and next decision"],[(r["Short criterion"]+"\n"+r.Action,r.Product+"\n"+r.Verdict,r.Evidence+" | "+r["Assessment date"]+" | "+r["Comparison ID"]+"\n"+r["Next decision"]+"\n"+r.Source) for _,r in e.iterrows()],[1,1,2.5])
             add("Importance without provenance is unresolved. Recorded support is not performance or commercial substitution.")
     def market():
@@ -94,7 +114,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         add("Categorical map: recorded functional overlap versus customer-segment evidence. Marker locations within a cell only separate labels. AIT-VISTA is the declared reference, not proven adoption.")
         if not d.empty:
             dr=Drawing(width,245);left=132;bottom=36;cw=(width-left-12)/4;ch=44
-            for i,lab in enumerate(CUSTOMER_LANES):
+            for i,lab in enumerate(["Unresolved","Adjacent sector","Space AIT target","Space AIT case"]):
                 dr.add(String(0,bottom+i*ch+19,lab,fontName=FONT,fontSize=7,fillColor=NAVY))
                 for j in range(4):dr.add(Rect(left+j*cw,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
             for j,lab in enumerate(["Unresolved","Some","Material","Broad"]):dr.add(String(left+j*cw+cw/2,18,lab,fontName=FONT,fontSize=7,textAnchor="middle",fillColor=NAVY))
@@ -110,7 +130,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
                 if j==3 and i==2:xx+=cw*.23;yy-=ch*.15
                 dr.add(Circle(xx,yy,6,fillColor=colors.HexColor("#466D8A"),strokeColor=colors.white,strokeWidth=.8))
                 if len(g)>1:
-                    dr.add(String(xx,yy-2,str(len(g)),fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=colors.white))
+                    dr.add(String(xx,yy-2,str(len(g))+"×",fontName=BOLD,fontSize=6,textAnchor="middle",fillColor=colors.white))
                 else:dr.add(String(xx,yy-2,label,fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=colors.white))
             story.append(dr)
             add("AIT-VISTA is the outlined reference beneath rival marks. Numbered markers identify single products; dense cells show group size. Exact product categories follow. Marker size is visual emphasis.","small")

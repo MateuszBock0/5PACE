@@ -11,6 +11,7 @@ def export_panel(st,data,cfg,snapshots,current,head,demo,primary,location="sideb
     stamp=next((s[1] for s in snapshots if s[0]==current),"")
     mode=dataset_label(data,source,current,head,demo)
     stamp,h,source=report_provenance(data,mode,stamp,digest(data),source)
+    if demo:stamp="Not applicable (synthetic)"
     k="pdf-"+location
     container=st.sidebar.expander("Export reports (PDF)") if location=="sidebar" else st.container(border=True)
     with container:

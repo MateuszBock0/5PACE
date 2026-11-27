@@ -9,7 +9,7 @@ from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
 from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes,brief_criteria,WORKFLOW_EXAMPLES,search_companies,short_reason,relationship_lane,commercial_summary
 from excel_archive import download_analysis
 from founder import strategic_map_cohort,map_exclusions
-from threat_watch import exposure,spread_points,short_criterion,selected_criteria
+from threat_watch import exposure,spread_points,short_criterion,selected_criteria,threat_cohort
 from decision import CUSTOMER_LANES,FUNCTION_LANES,company_brief,differentiation_questions,signals,importance_lane
 
 PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
@@ -99,7 +99,7 @@ def detail(st,data,pid,cid,key):
                 st.caption("Limitations: "+(value(r,"Limitations") or "Not recorded"))
                 for j,u in enumerate(value(r,"Source URLs").replace("\n",";").split(";")):
                     u=u.strip()
-                    if u.startswith(("https://","http://")) and not any(ch.isspace() for ch in u):st.link_button("Source: "+u.split("/")[2],u)
+                    if u.startswith(("https://","http://")) and not any(ch.isspace() for ch in u):st.link_button("Source: "+u.split("/")[2]+" ("+str(i+1)+"."+str(j+1)+")",u)
         with st.expander("Original active records"):source_records(st,active,key+"-active")
     with st.expander("Assessment history / superseded evidence"):
         source_records(st,history,key+"-history")
@@ -292,9 +292,7 @@ def advantage(st,data,cfg,rows):
     if rows.empty:return
     f=priority_families(rows)
     candidates=f[f.Order<4]
-    primary=(candidates if not candidates.empty else f).head(5)
-    research=f[f.Role=="Research / emerging entrant"].head(1)
-    default=pd.concat([primary,research]).drop_duplicates("Product ID")["Product ID"].tolist()
+    default=threat_cohort(data,rows)["Product ID"].tolist()
     names=rows.set_index("Product ID").Product.to_dict()
     ids=st.multiselect("Competitors to benchmark",list(names),default=default,format_func=names.get,key="founder-adv-products")
     selected=rows[rows["Product ID"].isin(ids)]
@@ -390,10 +388,14 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
 def response_view(st,data,cfg,rows,key):
     e=exposure(data,cfg,rows["Product ID"].tolist())
     if e.empty:return
-    fig=px.scatter(e,x="Overlap",y="Importance",color="Action",hover_name="Criterion",custom_data=["Product ID","Criterion ID"],hover_data=["Product","Verdict","Evidence","Assessment date","Next decision"])
+    xs=["No positive record / unresolved","Partial recorded","Full recorded"]
+    ys=["Unresolved","Low","Medium","High"]
+    e["X"]=e.Overlap.map(dict(zip(xs,range(len(xs)))))
+    e["Y"]=e.Importance.map(dict(zip(ys,range(len(ys)))))
+    points=spread_points(e,radius=.30)
+    fig=px.scatter(points,x="Display X",y="Display Y",color="Action",hover_name="Criterion",custom_data=["Product ID","Criterion ID"],hover_data={"Display X":False,"Display Y":False,"Overlap":True,"Importance":True,"Product":True,"Verdict":True,"Evidence":True,"Assessment date":True,"Next decision":True})
     fig.update_traces(marker={"size":12,"line":{"width":1,"color":"white"}})
-    # Categorical positions may overlap; exact rows are also selectable below.
-    fig.update_layout(height=320,xaxis={"categoryorder":"array","categoryarray":["No positive record / unresolved","Partial recorded","Full recorded"]},yaxis={"categoryorder":"array","categoryarray":["Unresolved","Low","Medium","High"]},legend={"orientation":"h"})
+    fig.update_layout(height=340,xaxis={"tickmode":"array","tickvals":list(range(3)),"ticktext":["Unresolved","Partial","Full"],"range":[-.5,2.5],"title":"Recorded overlap"},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":ys,"range":[-.5,3.5],"title":"Customer importance"},legend={"orientation":"h"})
     st.plotly_chart(fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"criterion"),selection_mode="points")
     st.caption("Unresolved importance is separate. React requires high provenance-bearing importance and technical-or-stronger positive evidence; Benchmark / Research / Monitor are action categories, not risk percentages.")
     c=st.selectbox("Inspect response criterion",e["Criterion ID"].tolist(),format_func=e.set_index("Criterion ID")["Short criterion"].to_dict().get,key=key+"-criterion")
@@ -406,15 +408,7 @@ def response_view(st,data,cfg,rows,key):
 
 def threat_view(st,data,cfg,rows):
     st.subheader("Threat Watch")
-    f=priority_families(rows)
-    # Select role-specific actual products, then inspect full cohort independently.
-    primary=f[f.Order<3].head(5)
-    research=f[f.Role=="Research / emerging entrant"]
-    if not research.empty:
-        # Prefer a research demonstrator with explicit strategic evidence.
-        research=research.sort_values(["Technical or stronger","Recorded overlap fraction"],ascending=False).head(1)
-    cohort=pd.concat([primary,research]).drop_duplicates("Product ID")
-    if cohort.empty:cohort=f.head(6)
+    cohort=threat_cohort(data,rows)
     names=rows.set_index("Product ID").Product.to_dict()
     ids=st.multiselect("Threat Watch products",list(names),default=cohort["Product ID"].tolist(),format_func=names.get,key="threat-products")
     selected=rows[rows["Product ID"].isin(ids)]
@@ -465,7 +459,9 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     scope=st.selectbox("Map scope",["Strategic + research","Commercial shortlist","Research & emerging","All products"],key="landing-map-scope")
     mapped=strategic_map_cohort(rows,scope)
     if mapped.empty:st.info("No products in the selected scope.")
-    else:render_map(st,data,mapped,"landing-map",True)
+    else:
+        render_map(st,data,mapped,"landing-map",True)
+        select_product(st,mapped,"landing-map-fallback","Inspect mapped product")
     st.caption(f"{len(mapped)} of {len(rows)} product records shown. Research entrants are included by default as a separate competitive role; absence is not a low-threat finding.")
     with st.expander("Why are other products not on this map?"):
         excluded=map_exclusions(rows,mapped)

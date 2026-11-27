@@ -1,6 +1,7 @@
 """5PACE Competitive Intelligence Engine — local browser interface."""
 from __future__ import annotations
 import html
+import os
 import json
 import subprocess
 import sys
@@ -22,8 +23,8 @@ from founder_ui import PRIMARY, founder_page
 from advanced_ui import (commercial_page, product_page, strategic_page, evolution_panel, research_panel, import_panel)
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
-st.title("5PACE | Competitive Intelligence Engine")
-st.caption("v1.4.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.markdown("**5PACE / INTELLIGENCE**")
+st.caption("v1.4.1-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -37,6 +38,8 @@ demo_mode=st.sidebar.checkbox("Synthetic demo mode",value=False,help="Never save
 if demo_mode:
     data=fixture()
     st.warning("SYNTHETIC DEMO — all displayed products and observations are fictitious.")
+elif os.environ.get("CIE_VISUAL_PREVIEW")=="1":
+    st.warning("SYNTHETIC UX PREVIEW — fictitious companies and evidence; not live research.")
 elif data is None:
     st.info("No local dataset yet. Configure read-only Google OAuth and run a first synchronisation. Once downloaded, the application works offline.")
 elif current!=head:

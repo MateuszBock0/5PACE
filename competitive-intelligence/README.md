@@ -1,6 +1,6 @@
 # Competitive Intelligence Engine
 
-Version 1.4.0-rc1 — founder-oriented command centre.
+Version 1.4.1-rc1 — visual refinement of founder-oriented command centre.
 
 ## First-time installation and authentication
 
@@ -150,3 +150,6 @@ Run `REBUILD_EXCEL_ARCHIVE.bat` once after updating to reconstruct every distinc
 Five primary workspaces: Command Centre, Competitor Explorer, Market Positioning, Competitive Advantage and Intelligence Monitor. Advanced Analytics preserves every prior workspace including Excel Archive and Synchronisation. Main views use the declared As-Is baseline; no methodology sliders. Product roles are provisional, role-based review order uses recorded strategic overlap and evidence, not threat probability. Map uses ordinal observed overlap and space applicability as a proxy, never asserts shared procurement. The AIT-VISTA reference is declared scope/target market. Heatmap retains vendor claims and explicit unresolved states; source details and histories are accessible. Profile links are available alongside primary charts and cards. Timeline dates are labelled as recorded assessments, observations, deployment or commercial dates. Actual product evolution and shared buyer evidence remain unresolved unless documented. No source changes.
 
 The strategic heatmap uses selectable coloured square cells and explicit evidence drill-down. Profile evidence is linked using existing IDs and company associations; company-level observations may refer to other products. The timeline labels date types and reports newly recorded commercial, deployment and product-position changes separately from actual market events. Shared procurement remains an unresolved question, not an invented axis score.
+
+## Visual refinement v1.4.1
+The uploaded UX brief guides a light teal interface, three summary cards and two-column landing page, alias search, profile overview cards with section navigation, qualitative relationship lanes (not quantified buyer overlap), labelled distinct heatmap states and fixed workflow criterion examples. Advanced Analytics retains full interval methods. The screenshot workflow uses only fictitious test data, never Google Sheets or operational SQLite. Customer importance remains optional and unknown if absent.

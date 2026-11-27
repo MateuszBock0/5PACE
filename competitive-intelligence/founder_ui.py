@@ -6,7 +6,7 @@ from core import value,connect,read_snapshot
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
-from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes
+from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes,brief_criteria,WORKFLOW_EXAMPLES,search_companies,short_reason,relationship_lane,commercial_summary
 from excel_archive import download_analysis
 
 PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
@@ -48,45 +48,51 @@ def select_product(st,rows,key,label="Inspect product",default=None):
 
 def detail(st,data,pid,cid,key):
     verdict,active,history=evidence_detail(data,pid,cid)
-    st.markdown("**Recorded verdict: "+verdict+"**")
+    criterion=registry(data,CRITERIA,"Criterion ID").get(cid,{})
+    st.markdown("**"+value(criterion,"Product criterion")+" — "+verdict+"**")
+    if value(criterion,"Type"): st.caption("Criterion type: "+value(criterion,"Type"))
     if not active: st.caption("No direct assessment. This is not evidence of non-support.")
     else: source_records(st,active,key+"-active")
     with st.expander("Assessment history / superseded evidence"):
         source_records(st,history,key+"-history")
 
-def heatmap(st,data,cfg,rows,key,ids=None):
+def heatmap(st,data,cfg,rows,key,ids=None,stage_labels=None):
     criteria=registry(data,CRITERIA,"Criterion ID")
-    ids=ids or strategic_criteria(data)
+    ids=ids or brief_criteria(data)
     if not ids or rows.empty: st.info("Direct comparison criteria or products unavailable.");return
     ps=rows["Product ID"].tolist()
     mat=direct_matrix(data,ps,ids)
     names=rows.set_index("Product ID").Product.to_dict()
     # Keep all distinct evidence states available in hover.
     states=["Explicitly unsupported","Unassessed","Unknown","Disputed","Not applicable","Announced","Partially supported","Supported"]
-    colors=["#b45b60","#727c8c","#727c8c","#ad78b5","#656970","#819fc1","#d1a54e","#339779"]
+    colors=["#f3d5d5","#e9eef2","#c8d6e3","#e5d6ef","#d9dce1","#dbe5f9","#f8e8cd","#d9eeea"]
     code={v:i for i,v in enumerate(states)}
-    labels=[value(criteria[c],"Product criterion") for c in ids]
+    labels=[(stage_labels.get(c,"")+" · " if stage_labels and c in stage_labels else "")+value(criteria[c],"Product criterion") for c in ids]
     mat.loc[VISTA]=[profile(cfg,c,"As-Is") for c in ids]
     mat=mat.loc[[VISTA]+ps]
-    marks={"Supported":"✓","Partially supported":"~","Explicitly unsupported":"×","Announced":"A","Disputed":"!","Not applicable":"N/A"}
+    marks={"Supported":"Supported","Partially supported":"Partial","Explicitly unsupported":"Unsupported","Unassessed":"Not assessed","Unknown":"Unknown","Announced":"Announced","Disputed":"Disputed","Not applicable":"N/A"}
     # Scatter-square heatmap enables native point selection and evidence drill-down.
     cells=[(j,i,p,c,mat.loc[p,c]) for i,c in enumerate(ids) for j,p in enumerate([VISTA]+ps)]
     current_labels=["AIT-VISTA"]+[names[p] for p in ps]
     fig=go.Figure(go.Scatter(x=[v[0] for v in cells],y=[v[1] for v in cells],mode="markers+text",
-        marker={"symbol":"square","size":32,"color":[colors[code.get(v[4],1)] for v in cells]},
-        text=[marks.get(v[4],"?") for v in cells],textfont={"color":"white","size":14},textposition="middle center",
+        marker={"symbol":"square","size":36,"opacity":0.01},
+        text=[marks.get(v[4],"Unknown") for v in cells],textfont={"color":"#26394b","size":12},textposition="middle center",
         customdata=[[v[2],v[3],v[4],current_labels[v[0]],labels[v[1]]] for v in cells],
         hovertemplate="%{customdata[3]}<br>%{customdata[4]}<br>%{customdata[2]}<extra></extra>"))
-    fig.update_layout(height=max(350,42*len(ids)+100),xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":current_labels,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
+    for j,i,p,c,s in cells:
+        fig.add_shape(type="rect",x0=j-.46,x1=j+.46,y0=i-.38,y1=i+.38,fillcolor=colors[code.get(s,1)],line={"width":0},layer="below")
+    fig.update_layout(height=max(320,40*len(ids)+100),plot_bgcolor="#ffffff",paper_bgcolor="#ffffff",xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":current_labels,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
     event=st.plotly_chart(fig,use_container_width=True,key="heat-"+key,on_select="rerun",selection_mode="points")
     points=event.selection.points if event is not None and hasattr(event,"selection") else []
     clicked=points[0].get("customdata",[]) if points else []
     pc=clicked[0] if len(clicked)>1 and clicked[0] in ps else None
     cc=clicked[1] if len(clicked)>1 and clicked[1] in ids else None
-    st.caption("Select a cell to inspect its evidence. ✓ Supported · ~ Partial · × Explicitly unsupported · ? Unknown/unassessed · ! Disputed · A Announced · N/A Not applicable. Vendor claims remain visible.")
+    st.caption("Select a cell to inspect evidence. Unknown = investigated but inconclusive; Not assessed = no direct record; Disputed = conflicting active records. Unsupported requires explicit evidence. Vendor claims remain visible.")
     p=select_product(st,rows,key+"-profile","Inspect comparison product",pc)
     c=st.selectbox("Inspect criterion evidence",ids,index=ids.index(cc) if cc else 0,format_func=lambda c:value(criteria[c],"Product criterion"),key="heat-c-"+key+("-"+cc if cc else ""))
-    if p:detail(st,data,p,c,key+"-evidence")
+    if p:
+        with st.expander("Selected cell — evidence and source",expanded=bool(pc)):
+            detail(st,data,p,c,key+"-evidence")
     with st.expander("Full comparison values"):
         table(st,mat.rename(index={VISTA:"AIT-VISTA",**names},columns=dict(zip(ids,labels))).rename_axis("Product").reset_index(),key+"-matrix",True)
 
@@ -97,7 +103,7 @@ def explorer(st,data,cfg,rows):
     if not companies:st.info("No companies available.");return
     q=st.text_input("Search companies, products or technologies",key="founder-search").strip().lower()
     names={c:value(r,"Company Name") for c,r in companies.items()}
-    ids=[c for c in sorted(names,key=lambda c:names[c].lower()) if not q or q in names[c].lower() or any(q in " ".join(value(p,f) for f in ["Product Name","Product Category","Primary Use Case","Product Description"]).lower() for p in products.values() if value(p,"Company ID")==c)]
+    ids=search_companies(data,q)
     if not ids: st.info("No matching company.");return
     pending=st.session_state.pop("founder_product_pending",None)
     existing=st.session_state.get("founder_company")
@@ -118,20 +124,35 @@ def explorer(st,data,cfg,rows):
     st.subheader(r.Product)
     st.markdown("**"+r["Review track"]+"**")
     st.write(value(p,"Product Description") or value(p,"Primary Use Case") or "Product description not recorded.")
+    records=profile_records(data,pid)
+    cards=st.columns(3)
+    with cards[0]:
+        with st.container(border=True):
+            st.markdown("**Customers / cases**")
+            customers=list(dict.fromkeys(value(x,"Customer Organisation") for x in records["Deployments"] if value(x,"Customer Organisation")))
+            st.write(", ".join(customers) if customers else "No customer cases recorded.")
+            st.caption(value(p,"Target Customers") or "Target customer not recorded.")
+    with cards[1]:
+        with st.container(border=True):
+            st.markdown("**Architecture**")
+            st.write(value(p,"Deployment Architecture") or "Not recorded")
+            st.caption(value(p,"Space Industry Applicability") or "Space applicability unresolved.")
+    with cards[2]:
+        with st.container(border=True):
+            st.markdown("**Commercial model**")
+            st.write(commercial_summary(records)[0])
+            st.caption("See Pricing for basis, dates and implementation limitations.")
     a,b=st.columns(2)
     with a:
-        st.markdown("**Why 5PACE should care**")
+        st.markdown("**Why it matters**")
         st.write(r["Why care"])
-        st.markdown("**What remains unconfirmed**")
+    with b:
+        st.markdown("**What needs confirmation**")
         st.write(r.Unresolved)
         st.caption(r["Buyer / procurement overlap"])
-    with b:
-        st.markdown("**Target customers & deployment**")
-        for f in ["Primary Use Case","Target Customers","Target Industries","Deployment Architecture","Commercial Status","Space Industry Applicability"]:
-            st.write("**"+f+":** "+(value(p,f) or "Not recorded"))
     if value(p,"Product URL").startswith(("https://","http://")):st.link_button("Product website",value(p,"Product URL"))
     findings=profile_findings(data,cfg,pid)
-    with st.expander("Strategic strengths, differences and unresolved questions",expanded=True):
+    with st.expander("Strategic strengths, differences and unresolved questions"):
         for heading,items in findings.items():
             st.markdown("**"+heading+"**")
             if items:
@@ -139,26 +160,28 @@ def explorer(st,data,cfg,rows):
             else: st.caption("None established in the strategic comparison set.")
         st.caption("Partial support is a categorical scope difference, not measured performance. Weak evidence does not establish a competitor weakness.")
     records=profile_records(data,pid)
-    tabs=st.tabs(["Portfolio & commercial","Head-to-head","Evidence & developments"])
-    with tabs[0]:
-        st.markdown("**Products and families**")
+    section=st.radio("Profile section",["Overview","Products","Compare","Deployments","Pricing","Evidence","Timeline"],horizontal=True,key="profile-section")
+    if section=="Overview":
+        st.write(value(p,"Primary Use Case") or "Primary use case not recorded.")
+        st.caption("Target industries: "+(value(p,"Target Industries") or "Not recorded"))
+        with st.expander("Original company and product records"):source_records(st,[co,p],"source-profile")
+    elif section=="Products":
         table(st,company_rows[["Product","Role","Commercial status","Family ID"]],"portfolio")
-        st.markdown("**Customer cases & deployments**")
-        source_records(st,records["Deployments"],"deployments")
-        st.markdown("**Business model, price & implementation**")
-        source_records(st,records["Commercial Intelligence"],"commercial")
-        st.caption("Missing pricing or adoption records are unknown, not zero.")
-        with st.expander("Original company and product records"):
-            source_records(st,[co,p],"source-profile")
-    with tabs[1]:
+    elif section=="Compare":
         heatmap(st,data,cfg,company_rows[company_rows["Product ID"]==pid],"profile",list(registry(data,CRITERIA,"Criterion ID")) if st.checkbox("Show all criteria",key="profile-all") else None)
-    with tabs[2]:
+    elif section=="Deployments":
+        source_records(st,records["Deployments"],"deployments")
+    elif section=="Pricing":
+        source_records(st,records["Commercial Intelligence"],"commercial")
+        st.caption("Missing price or cost is unknown, not zero.")
+    elif section=="Evidence":
+        for tab in ["Observations","Key Competitors","Capability Assessment","Comparison Assessment"]:
+            with st.expander(tab):source_records(st,records[tab],"profile-"+tab)
+    else:
         t=timeline(data)
         t=t[(t["Company ID"]==cid)&(t["Product ID"].isin(["",pid]))]
         st.caption("Company observations may concern other products; check the source. Recorded dates are not necessarily release dates.")
         table(st,t,"profile-timeline",True)
-        for tab in ["Observations","Key Competitors","Capability Assessment","Comparison Assessment"]:
-            with st.expander(tab):source_records(st,records[tab],"profile-"+tab)
 
 def positioning(st,data,cfg,rows):
     st.header("Market Positioning")
@@ -171,18 +194,21 @@ def positioning(st,data,cfg,rows):
     ids=st.multiselect("Products on strategic map",list(names),default=default,format_func=names.get,key="founder-map-products")
     d=rows[rows["Product ID"].isin(ids)].copy()
     if d.empty:st.info("Select products to compare.");return
-    # Ordinal categories, not an invented customer-overlap score.
+    # Qualitative relationship lanes, not measured customer/procurement positions.
+    lanes=["Complementary / enabling","Cross-industry technology","Workflow / budget candidates","Visual AIT candidates","Unresolved / other"]
     xs=["No positive record / unresolved","Some recorded overlap","Material recorded overlap","Broad recorded overlap"]
-    ys=["Current space-market fit unresolved","Space offering","Space deployment / adoption signal","AIT-VISTA target market"]
-    d["X"]=d["Functional overlap"].map(dict(zip(xs,range(len(xs)))))
-    d["Y"]=d["Space market evidence"].map(dict(zip(ys,range(len(ys)))))
-    # Offsets only separate labels sharing a category; no numeric inference.
+    d["Lane"]=d.apply(relationship_lane,axis=1)
+    d["X"]=d["Functional overlap"].map(dict(zip(xs,range(len(xs))))).astype(float)
+    d["Y"]=d["Lane"].map(dict(zip(lanes,range(len(lanes))))).astype(float)
     for _,g in d.groupby(["X","Y"]):
         for k,(idx,_) in enumerate(g.iterrows()):
-            d.loc[idx,"X"]+=(k-(len(g)-1)/2)*min(.10,.6/max(1,len(g)-1))
-    fig=px.scatter(d,x="X",y="Y",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data={"X":False,"Y":False,"Company":True,"Functional overlap":True,"Space market evidence":True,"Buyer / procurement overlap":True,"Why care":True})
-    fig.add_trace(go.Scatter(x=[3],y=[3],mode="markers+text",text=["AIT-VISTA"],textposition="bottom left",name="AIT-VISTA declared reference",marker={"symbol":"star","size":19,"color":"#39aa83"},hovertemplate="Declared scope and target segment, not proven customer adoption<extra></extra>"))
-    fig.update_layout(xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":xs,"range":[-.5,3.5],"title":"Recorded strategic functional overlap"},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":ys,"range":[-.4,3.5],"title":"Space-market evidence (proxy, not shared procurement)"},height=510)
+            d.loc[idx,"X"]+=(k-(len(g)-1)/2)*min(.13,.6/max(1,len(g)-1))
+    fig=px.scatter(d,x="X",y="Y",color="Lane",hover_name="Product",text="Company",custom_data=["Product ID"],hover_data={"X":False,"Y":False,"Functional overlap":True,"Space market evidence":True,"Buyer / procurement overlap":True,"Why care":True})
+    fig.update_traces(marker={"size":12},textposition="top center")
+    fig.add_trace(go.Scatter(x=[3],y=[3],mode="markers+text",text=["AIT-VISTA"],textposition="bottom left",name="AIT-VISTA reference",marker={"symbol":"star","size":19,"color":"#087e7b"},hovertemplate="Declared AIT-VISTA scope and target; not measured market share<extra></extra>"))
+    for i,color in enumerate(["#eaf0f3","#e4eff9","#fbefdc","#f9e6e6","#f0f1f3"]):
+        fig.add_hrect(y0=i-.45,y1=i+.45,fillcolor=color,line_width=0,layer="below")
+    fig.update_layout(showlegend=False,xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":xs,"range":[-.5,3.5],"title":"Recorded strategic functional overlap"},yaxis={"tickmode":"array","tickvals":list(range(5)),"ticktext":lanes,"range":[-.5,4.5],"title":"Provisional competitive relationship (categorical)"},height=480)
     event=st.plotly_chart(fig,use_container_width=True,on_select="rerun",selection_mode="points",key="founder-map")
     points=event.selection.points if event is not None and hasattr(event,"selection") else []
     clicked=points[0].get("customdata",[]) if points else []
@@ -190,21 +216,15 @@ def positioning(st,data,cfg,rows):
         r=d[d["Product ID"]==clicked[0]].iloc[0]
         st.write(r["Why care"]);open_profile(st,r["Product ID"],r["Company ID"],"map-click")
     select_product(st,d,"map")
-    st.caption("Categories use observed weighted overlap over strategic criteria (partial = 0.5; thresholds 1/3 and 2/3). Missing evidence can hide overlap, so this is not a true low-threat designation. Shared buyer/budget is unresolved unless separately investigated. The AIT-VISTA star is a declared reference, not market leadership.")
+    st.caption("Lanes reflect provisional roles, not a verified shared purchasing decision. Space-market evidence and customer fit are shown in hover and profiles. Missing evidence is not low threat. Horizontal offsets separate labels only.")
     st.subheader("AIT workflow coverage")
-    tax=taxonomy(data,cfg)
-    m=direct_matrix(data,ids)
-    lo,hi,_,_=interval_arrays(data,m,cfg,"As-Is","All recorded verdicts")
-    w,b=workflow_benchmark(lo,hi,tax)
-    if not w.empty:
-        w["Product"]=w["Product ID"].map({VISTA:"AIT-VISTA",**names})
-        w["Unresolved"]=w.Upper-w.Lower;w["Zero"]=0.
-        fig=px.bar(w,x="Stage",y="Lower",color="Product",barmode="group",error_y="Unresolved",error_y_minus="Zero",hover_data=["Upper"])
-        fig.update_layout(yaxis={"range":[0,1.05],"tickformat":".0%","title":"Recorded stage coverage"},height=440)
-        st.plotly_chart(fig,use_container_width=True)
-        select_product(st,d,"workflow")
-        st.caption("Recorded features do not establish integrated end-to-end operation. Intervals are retained here for drill-down.")
-    else:st.info("No workflow mapping available.")
+    criteria=registry(data,CRITERIA,"Criterion ID")
+    stages={c:label for label,c in WORKFLOW_EXAMPLES if c in criteria}
+    if stages:
+        heatmap(st,data,cfg,d,"workflow",list(stages),stage_labels=stages)
+        st.caption("Selected criterion examples by workflow stage, not proof of complete or integrated stage coverage.")
+    else:
+        st.info("Workflow example criteria are absent in this snapshot. Open Advanced Analytics for mapped stage coverage.")
 
 def advantage(st,data,cfg,rows):
     st.header("Competitive Advantage")
@@ -284,25 +304,50 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
             select_product(st,rows[rows["Product ID"].isin(q.head(15)["Product ID"])],"research")
 
 def landing(st,data,cfg,rows,snapshots,current,demo):
-    st.header("Command Centre")
-    st.caption("What matters now — competitive relevance, differentiation and decisions.")
+    st.header("Competitive Command Centre")
+    st.caption("What should 5PACE pay attention to today?")
     if rows.empty:st.info("No product records yet.");return
     f=priority_families(rows)
-    for order,title in [(0,"Core visual competition"),(1,"Workflow and customer-budget substitutes"),(2,"Adjacent market candidates"),(3,"Classification needs review")]:
-        group=f[f.Order==order]
-        if group.empty:continue
-        st.subheader(title)
-        for _,r in group.head(4 if order<2 else 2).iterrows():
+    stamp=next((x[1] for x in snapshots if x[0]==current),"Not captured")
+    st.caption("Snapshot: "+stamp+" · "+("Synthetic demonstration" if demo else "Local read-only data"))
+    cards=st.columns(3)
+    groups=[("Closest visual rivals",f[f.Order==0],"Visual AIT candidates"),
+            ("Budget substitutes",f[f.Order==1],"Workflow / purchasing alternatives"),
+            ("Technology benchmarks",f[f.Order.isin([0,2])].sort_values(["Recorded overlap fraction","Technical or stronger"],ascending=False),"Recorded visual or cross-industry overlap")]
+    for col,(title,g,caption) in zip(cards,groups):
+        with col:
             with st.container(border=True):
-                a,b=st.columns([4,1])
+                st.caption(title)
+                st.markdown("**"+(" · ".join(g.Company.drop_duplicates().head(2)) if not g.empty else "Unresolved")+"**")
+                st.caption(caption)
+    left,right=st.columns([1.6,1])
+    with left:
+        st.subheader("Why watch these companies?")
+        items=pd.concat([g.head(2) for _,g,_ in groups]).drop_duplicates("Family ID").head(5)
+        if items.empty:items=f.head(4)
+        for _,r in items.iterrows():
+            with st.container(border=True):
+                a,b=st.columns([3,1])
                 with a:
                     st.markdown("**"+r.Company+" · "+r.Product+"**")
-                    st.write(r["Why care"])
-                    st.caption("Unresolved: "+r.Unresolved)
+                    st.caption(r["Review track"])
+                    st.write(short_reason(r))
                 with b:open_profile(st,r["Product ID"],r["Company ID"],"landing-"+r["Product ID"])
-        if len(group)>(4 if order<2 else 2):st.caption("More products are available in Competitor Explorer.")
-    st.caption("Review order is role-based, then recorded overlap and evidence, not a probability of lost sales. All roles remain accessible. Source classifications are provisional.")
-    st.button("Open full company directory",on_click=navigate,args=(st,None,None,"Competitor Explorer"),key="landing-directory")
+        st.button("Open full company directory",on_click=navigate,args=(st,None,None,"Competitor Explorer"),key="landing-directory")
+    with right:
+        st.subheader("Recent strategic signals")
+        t=timeline(data)
+        names=registry(data,"Companies","Company ID")
+        latest=t[t["Date basis"]=="Observation recorded"].head(4)
+        if latest.empty:st.caption("No observations recorded.")
+        for i,(_,r) in enumerate(latest.iterrows()):
+            with st.container(border=True):
+                st.markdown("**"+(value(names.get(r["Company ID"],{}),"Company Name") or "Observation")+"**")
+                st.caption(r.Date+" · research recorded")
+                st.write(r.Development)
+                if r["Company ID"] in names:open_profile(st,None,r["Company ID"],"news-"+str(i))
+        st.button("Intelligence Monitor",on_click=navigate,args=(st,None,None,"Intelligence Monitor"),key="landing-monitor")
+    st.caption("Qualitative review order, not a calibrated threat score. Full rationale, source dates and unresolved questions are in each profile.")
     st.subheader("Where we may differentiate")
     families=f[f.Order<3]["Family ID"].tolist()
     candidates=rows[rows["Family ID"].isin(families)]["Product ID"].tolist()
@@ -310,21 +355,11 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         d=advantage_summary(data,cfg,candidates)
         if not d.empty:
             strong=d[d.Finding=="Substantiated functional advantage"]
-            if strong.empty:st.info("No cohort-wide substantiated functional advantage under the technical-evidence scenario. This does not imply absence of differentiation.")
+            if strong.empty:st.info("No cohort-wide substantiated functional advantage under the technical-evidence scenario. Differentiation is still possible.")
             else:table(st,strong[["Criterion","Finding","Decision"]],"verified-advantage")
             potential=d[d.Finding.str.contains("Potential|Insufficient",regex=True)]
-            table(st,potential[["Criterion","Finding","Decision"]].head(6),"potential-advantage")
+            table(st,potential[["Criterion","Finding","Decision"]].head(5),"potential-advantage")
     st.button("Explore competitive advantage",on_click=navigate,args=(st,None,None,"Competitive Advantage"),key="landing-adv")
-    st.subheader("Recently recorded intelligence")
-    t=timeline(data)
-    if not t.empty:
-        latest=t[t["Date basis"]=="Observation recorded"].head(4)
-        names=registry(data,"Companies","Company ID")
-        for i,(_,r) in enumerate(latest.iterrows()):
-            st.markdown("**"+value(names.get(r["Company ID"],{}),"Company Name")+" · "+r.Date+"**")
-            st.write(r.Development)
-            if r["Company ID"] in names:open_profile(st,None,r["Company ID"],"news-"+str(i))
-    st.button("Review developments and research priorities",on_click=navigate,args=(st,None,None,"Intelligence Monitor"),key="landing-monitor")
 
 def founder_page(st,page,data,cfg,snapshots,current,demo):
     rows=summaries(data)

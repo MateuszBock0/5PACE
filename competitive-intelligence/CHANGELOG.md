@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1-rc1 — UX brief refinement
+
+- Compact founder landing, light teal theme, company alias search, profile cards and seven profile sections.
+- Qualitative competitive lanes, labelled assessment cells and selectable workflow examples.
+- Browser screenshot artifact from synthetic fixtures only; no source changes.
+
 ## 1.4.0-rc1 — Founder-first UX
 
 - Five strategic workspaces and a separate Advanced Analytics navigation.

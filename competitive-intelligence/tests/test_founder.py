@@ -48,3 +48,14 @@ def test_profile_strengths_and_commercial_changes():
     c=recorded_market_changes(d,b)
     assert c.iloc[0]["Recorded change"]=="Commercial Status"
     assert "not established" in c.iloc[0].Interpretation
+
+def test_brief_search_and_lanes():
+    from founder import search_companies,relationship_lane,commercial_summary,brief_criteria
+    d=comparison_fixture()
+    d["Companies"]["rows"][0]["Alternative Names"]="Alt Vision; AV"
+    d["Products"]["rows"][1]["Alternative Names"]="Proc alias"
+    assert search_companies(d,"alt vision")==["DEMO-CO-1"]
+    assert search_companies(d,"proc alias")==["DEMO-CO-2"]
+    assert relationship_lane({"Role":"Unresolved role"})=="Unresolved / other"
+    assert brief_criteria(d)==["CR1"]
+    assert "not recorded" in commercial_summary({})[0]

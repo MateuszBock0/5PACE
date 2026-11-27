@@ -171,3 +171,25 @@ def commercial_summary(records):
         text=" · ".join(x for x in [value(r,"Business Model"),value(r,"Pricing Model"),*prices,value(r,"Price Basis"),value(r,"Applicable Date")] if x)
         if text:out.append(text)
     return out or ["Commercial model / pricing not recorded."]
+
+def strategic_map_cohort(rows,scope="Strategic + research",limit=10):
+    """Keep research entrants visible independently of their commercial rank.
+    Family representatives are actual products; all-products mode exposes modules.
+    """
+    if rows.empty:return rows.copy()
+    if scope=="All products":return rows.copy()
+    f=priority_families(rows)
+    research=f[f.Role=="Research / emerging entrant"]
+    if scope=="Research & emerging":return research.copy()
+    commercial=f[f.Order<3].head(limit)
+    if scope=="Commercial shortlist":return commercial.copy()
+    return pd.concat([commercial,research],ignore_index=True).drop_duplicates("Family ID")
+
+def map_exclusions(rows,shown):
+    if rows.empty:return pd.DataFrame()
+    selected=set(shown["Product ID"]) if not shown.empty else set()
+    d=rows[~rows["Product ID"].isin(selected)].copy()
+    if d.empty:return d
+    families=set(shown["Family ID"]) if not shown.empty else set()
+    d["Reason not shown"]=d.apply(lambda r:"Another family member is shown" if r["Family ID"] in families else "Outside selected map scope or shortlist limit",axis=1)
+    return d

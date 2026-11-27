@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.3-rc1 — QA & PDF reporting
+
+- Include research entrants in the default strategic map; explicit scope and exclusion reasons.
+- Seven PDF report types, shared export panel and snapshot provenance.
+- Preserve exact selected evidence across reruns; single-company strategic cards.
+- Offline PDF tests and research-entrant regression coverage.
+
 ## 1.4.2-rc1 — Strategic decision UX
 
 - Independent customer-segment evidence categories and direct map-to-profile navigation.

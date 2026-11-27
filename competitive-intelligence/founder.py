@@ -9,6 +9,8 @@ from competitive_roles import classify,family_root
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,advantage_portfolio,VISTA,workflow_benchmark
 
+CORE_IDS=["AV-CR-"+x for x in ("003","004","002","020","005","008","022","023")]
+SPACE_CUSTOMER={"Space AIT target segment","Space AIT implementation case"}
 CORE_PATTERNS=[r"physical configuration",r"observed.*execution",r"automated.*documentation",r"offline",r"passive.*recording",r"mechanism deployment|dynamic behaviour",r"vendor.independent|modular software",r"enterprise system integration"]
 POSITIVE={"Supported","Partially supported"}
 CORE_ROLES={"Direct visual AIT candidate","Workflow / procurement substitute candidate"}
@@ -30,7 +32,7 @@ def summaries(data):
     companies=registry(data,"Companies","Company ID")
     criteria=registry(data,CRITERIA,"Criterion ID")
     current=direct_current(data)
-    strategic=strategic_criteria(data)
+    strategic=CORE_IDS
     out=[]
     for pid,p in products.items():
         cl=classify(p);role=cl["Analytical role"]
@@ -44,7 +46,9 @@ def summaries(data):
         space=value(p,"Space Industry Applicability")
         market="Space deployment / adoption signal" if space in {"Space AIT deployment","Space manufacturing deployment","Space manufacturing adoption signal"} else "Space offering" if space=="Space offering" else "Current space-market fit unresolved"
         # Only recorded scope, never a negative inference from missing data.
-        fraction=(len(full)+.5*len(partial))/max(1,len(strategic))
+        fraction=(len(full)+.5*len(partial))/8
+        coverage=sum((pid,c) in current for c in strategic)/8
+        determinate=(8-len(unresolved))/8
         x="Broad recorded overlap" if fraction>=2/3 else "Material recorded overlap" if fraction>=1/3 else "Some recorded overlap" if fraction>0 else "No positive record / unresolved"
         if role=="Direct visual AIT candidate": tier="Core visual competition";order=0
         elif role=="Workflow / procurement substitute candidate": tier="Workflow / budget substitution candidate";order=1
@@ -54,11 +58,11 @@ def summaries(data):
         position=customer_position(p,deps)
         why=[]
         if full or partial:
-            why.append("Recorded overlap: "+ "; ".join(value(criteria[c],"Product criterion") + (" (partial)" if c in partial else "") for c in (full+partial)[:3]))
+            why.append("Recorded overlap: "+ "; ".join(value(criteria.get(c,{}),"Product criterion") or c + (" (partial)" if c in partial else "") for c in (full+partial)[:3]))
         if documented: why.append("Implementation records: "+", ".join(dict.fromkeys(value(r,"Customer Organisation") for r in documented if value(r,"Customer Organisation"))) if any(value(r,"Customer Organisation") for r in documented) else "Implementation records available.")
         why.append(cl["Classification basis"])
-        unresolved_text="; ".join(value(criteria[c],"Product criterion") for c in unresolved[:3])
-        out.append({"Product ID":pid,"Company ID":cid,"Company":value(companies.get(cid,{}),"Company Name"),"Product":value(p,"Product Name"),"Family ID":family_root(products,pid),"Role":role,"Source classification":cl["Source role"],"Review track":tier,"Order":order,"Why care":" · ".join(why),"Unresolved":unresolved_text or "No unresolved strategic criterion in selected set","Buyer / procurement overlap":"Unconfirmed — shared procurement decision not recorded in structured fields",**position,"Decision":decision_for(role),"Space market evidence":market,"Functional overlap":x,"Recorded full":len(full),"Recorded partial":len(partial),"Technical or stronger":len(strong),"Implementation records":len(documented),"Recorded overlap fraction":fraction,"Commercial status":value(p,"Commercial Status") or "Unknown","Classification basis":cl["Classification basis"]})
+        unresolved_text="; ".join((value(criteria.get(c,{}),"Product criterion") or c) for c in unresolved[:3])
+        out.append({"Product ID":pid,"Company ID":cid,"Company":value(companies.get(cid,{}),"Company Name"),"Product":value(p,"Product Name"),"Family ID":family_root(products,pid),"Role":role,"Source classification":cl["Source role"],"Review track":tier,"Order":order,"Why care":" · ".join(why),"Unresolved":unresolved_text or "No unresolved strategic criterion in selected set","Buyer / procurement overlap":"Unconfirmed — shared procurement decision not recorded in structured fields",**position,"Decision":decision_for(role),"Space market evidence":market,"Functional overlap":x,"Recorded full":len(full),"Recorded partial":len(partial),"Technical or stronger":len(strong),"Implementation records":len(documented),"Recorded overlap fraction":fraction,"Core evidence coverage":coverage,"Core determinate coverage":determinate,"Commercial status":value(p,"Commercial Status") or "Unknown","Classification basis":cl["Classification basis"]})
     return pd.DataFrame(out).sort_values(["Order","Recorded overlap fraction","Technical or stronger","Implementation records","Product"],ascending=[True,False,False,False,True]) if out else pd.DataFrame()
 
 def priority_families(rows):
@@ -172,32 +176,34 @@ def commercial_summary(records):
         if text:out.append(text)
     return out or ["Commercial model / pricing not recorded."]
 
-DEFAULT_MAP_SCOPE="Strategically relevant (axis union)"
-MAP_SCOPES=[DEFAULT_MAP_SCOPE,"Strategic + research","Commercial shortlist","Research & emerging","All products"]
+DEFAULT_MAP_SCOPE="Strategic core (40% / 60%)"
+SPACE_WATCH="Space Watch / research"
+MAP_SCOPES=[DEFAULT_MAP_SCOPE,SPACE_WATCH,"All products","Custom selection"]
+def eligible(score,customer):
+    return score>=.60 or (score>=.40 and customer in SPACE_CUSTOMER)
 
 def axis_eligible(rows):
-    return rows["Customer position"].isin(["Space AIT target segment","Space AIT implementation case"]) | rows["Functional overlap"].isin(["Material recorded overlap","Broad recorded overlap"])
+    return (rows["Recorded overlap fraction"]>=.60)|((rows["Recorded overlap fraction"]>=.40)&rows["Customer position"].isin(SPACE_CUSTOMER))
 
 def strategic_map_cohort(rows,scope=DEFAULT_MAP_SCOPE,limit=10):
-    """Default union evaluated for every actual product, without role/family/rank filters."""
+    """One dynamic product-level default. Legacy explicit scopes only for compatibility."""
     if rows.empty:return rows.copy()
     if scope=="All products":return rows.copy()
     if scope==DEFAULT_MAP_SCOPE:return rows[axis_eligible(rows)].copy()
-    f=priority_families(rows)
-    research=f[f.Role=="Research / emerging entrant"]
-    if scope=="Research & emerging":return research.copy()
-    commercial=f[f.Order<3].head(limit)
-    if scope=="Commercial shortlist":return commercial.copy()
-    return pd.concat([commercial,research],ignore_index=True).drop_duplicates("Family ID")
+    if scope==SPACE_WATCH:
+        return rows[~axis_eligible(rows)&(rows["Customer position"].isin(SPACE_CUSTOMER)|(rows.Role=="Research / emerging entrant"))].copy()
+    if scope=="Research & emerging":return rows[rows.Role=="Research / emerging entrant"].copy()
+    if scope=="Commercial shortlist":return priority_families(rows)[lambda d:d.Order<3].head(limit)
+    if scope=="Strategic + research":
+        return pd.concat([priority_families(rows)[lambda d:d.Order<3].head(limit),rows[rows.Role=="Research / emerging entrant"]]).drop_duplicates("Family ID")
+    return rows.iloc[:0].copy()
 
 def map_exclusions(rows,shown,scope=None):
     if rows.empty:return pd.DataFrame()
     selected=set(shown["Product ID"]) if not shown.empty else set()
     d=rows[~rows["Product ID"].isin(selected)].copy()
     if d.empty:return d
-    families=set(shown["Family ID"]) if not shown.empty else set()
     if scope==DEFAULT_MAP_SCOPE:
-        d["Reason not shown"]="Neither target/case customer evidence nor material/broad recorded overlap"
-    else:
-        d["Reason not shown"]=d.apply(lambda r:"Another family member is shown (selected shortlist only)" if r["Family ID"] in families else "Outside selected map scope or shortlist limit",axis=1)
+        d["Reason not shown"]=d.apply(lambda r:f'{r["Recorded overlap fraction"]:.2%} recorded overlap; threshold {"40%" if r["Customer position"] in SPACE_CUSTOMER else "60%"}; not a low-threat finding',axis=1)
+    else:d["Reason not shown"]="Outside explicit selected scope; not a low-threat finding"
     return d

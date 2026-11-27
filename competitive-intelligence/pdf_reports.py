@@ -91,7 +91,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         t.setStyle(TableStyle(ts));story.extend([t,Spacer(1,8)])
     def overview():
         heading("Strategic watchlist")
-        add("Recorded roles are provisional; actual procurement overlap is unresolved. Research entrants are included independently of commercial ranking.")
+        add("Recorded roles are provisional; actual procurement overlap is unresolved. Default strategic core: ≥60% recorded overlap, or ≥40% with Space AIT target/case evidence. Space Watch / research is separate. No rank or family exclusions.")
         table(["Company / product","Competitive role and decision","Evidence / uncertainty"],[(r.Company+"\n"+r.Product,r.Role+"\n"+r.Decision,r["Why care"]+"\n"+r.Unresolved) for _,r in d.iterrows()],[1.2,1.6,2.5])
     def threat():
         heading("Threat Watch and response priorities")
@@ -118,32 +118,30 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
             add("Importance without provenance is unresolved. Recorded support is not performance or commercial substitution.")
     def market():
         heading("Technology × customer positioning")
-        add("Categorical map: recorded functional overlap versus customer-segment evidence. Marker locations within a cell only separate labels. AIT-VISTA is the declared reference, not proven adoption.")
+        add("Recorded overlap = 100 × (full + 0.5 × partial) / 8 fixed core criteria. Missing evidence earns no positive credit; 0% is not proof of non-support. Customer evidence is independent; AIT-VISTA is the 100% declared reference.")
+        dr=Drawing(width,245);left=110;bottom=36;cw=width-left-24;ch=44
+        for i,lab in enumerate(["Unresolved","Adjacent sector","Space AIT target","Space AIT case"]):
+            dr.add(String(0,bottom+i*ch+19,lab,fontName=FONT,fontSize=7,fillColor=NAVY))
+            threshold=.4 if i>=2 else .6
+            dr.add(Rect(left,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
+            dr.add(Rect(left+threshold*cw,bottom+i*ch,(1-threshold)*cw,ch,strokeColor=colors.white,fillColor=colors.HexColor("#D9EEEA")))
+        for tick in range(0,101,20):dr.add(String(left+tick/100*cw,18,str(tick)+"%",fontName=FONT,fontSize=7,textAnchor="middle",fillColor=NAVY))
+        rx=left+cw;ry=bottom+2.5*ch
+        dr.add(Circle(rx,ry,17,fillColor=colors.HexColor("#D9EEEA"),strokeColor=TEAL,strokeWidth=1.2))
+        dr.add(String(rx,ry+19,"AIT-VISTA",fontName=BOLD,fontSize=7,textAnchor="end",fillColor=TEAL))
         if not d.empty:
-            dr=Drawing(width,245);left=132;bottom=36;cw=(width-left-12)/4;ch=44
-            for i,lab in enumerate(["Unresolved","Adjacent sector","Space AIT target","Space AIT case"]):
-                dr.add(String(0,bottom+i*ch+19,lab,fontName=FONT,fontSize=7,fillColor=NAVY))
-                for j in range(4):dr.add(Rect(left+j*cw,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
-            for j,lab in enumerate(["Unresolved","Some","Material","Broad"]):dr.add(String(left+j*cw+cw/2,18,lab,fontName=FONT,fontSize=7,textAnchor="middle",fillColor=NAVY))
-            rx=left+3.5*cw;ry=bottom+2.5*ch
-            dr.add(Circle(rx,ry,17,fillColor=colors.HexColor("#D9EEEA"),strokeColor=TEAL,strokeWidth=1.2))
-            dr.add(String(rx,ry+19,"AIT-VISTA",fontName=BOLD,fontSize=7,textAnchor="middle",fillColor=TEAL))
-            for (x,y),g in d.groupby(["Functional overlap","Customer position"]):
-                if x not in FUNCTION_LANES or y not in CUSTOMER_LANES:continue
-                j=FUNCTION_LANES.index(x);i=CUSTOMER_LANES.index(y)
-                # For dense maps label groups, and supply exact membership below.
-                label=str(len(g))+" products" if len(g)>1 else str(ids.index(g.iloc[0]["Product ID"])+1)
-                xx=left+j*cw+cw/2;yy=bottom+i*ch+ch/2
-                if j==3 and i==2:xx+=cw*.23;yy-=ch*.15
+            for (x,y),g in d.groupby(["Recorded overlap fraction","Customer position"]):
+                if y not in CUSTOMER_LANES:continue
+                xx=left+x*cw;yy=bottom+(CUSTOMER_LANES.index(y)+.5)*ch
+                if x==1 and y==CUSTOMER_LANES[2]:yy-=10
                 dr.add(Circle(xx,yy,6,fillColor=colors.HexColor("#466D8A"),strokeColor=colors.white,strokeWidth=.8))
-                if len(g)>1:
-                    dr.add(String(xx,yy-2,str(len(g))+"×",fontName=BOLD,fontSize=6,textAnchor="middle",fillColor=colors.white))
-                else:dr.add(String(xx,yy-2,label,fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=colors.white))
-            story.append(dr)
-            add("AIT-VISTA is the outlined reference beneath rival marks. Numbered markers identify single products; dense cells show group size. Exact product categories follow. Marker size is visual emphasis.","small")
-        table(["# / product","Functional overlap","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,r["Functional overlap"],r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(d.iterrows())],[1.1,1,2.2])
+                label=str(len(g))+"×" if len(g)>1 else str(ids.index(g.iloc[0]["Product ID"])+1)
+                dr.add(String(xx,yy-2,label,fontName=BOLD,fontSize=6,textAnchor="middle",fillColor=colors.white))
+        story.append(dr)
+        add("Shading denotes the default eligibility rule. Dense cells show group size; exact product values are listed below. Horizontal positions are not jittered.","small")
+        table(["# / product","Overlap / coverage","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,f'{r["Recorded overlap fraction"]:.2%} overlap; {r["Core evidence coverage"]:.2%} recorded; {r["Core determinate coverage"]:.2%} determinate',r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(d.iterrows())],[1.1,1,2.2])
         heading("Map scope and exclusions")
-        add(map_scope+" — "+str(len(ids))+" of "+str(len(rows))+" products. Default union uses original categories; no family or role restriction.")
+        add(map_scope+" — "+str(len(ids))+" of "+str(len(rows))+" products. Default uses the unrounded 40% / 60% rule; no family or role restriction.")
         from founder import map_exclusions
         excluded=map_exclusions(rows,d,map_scope)
         if not excluded.empty:table(["Product","Reason not shown"],[(r.Product,r["Reason not shown"]) for _,r in excluded.iterrows()],[1,2])
@@ -211,6 +209,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     add("Snapshot: "+(snapshot_hash or digest(data)),"small")
     add("Generated UTC: "+datetime.now(timezone.utc).isoformat(timespec="seconds"),"small")
     add("Report cohort: "+str(len(ids))+" products; Threat Watch criteria: "+str(len(cids))+". AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
+    if not ids:add("No qualifying products in this scope. Use Space Watch / research or All products; no fallback was applied.")
     def overview_with_threat():
         overview()
         threat()

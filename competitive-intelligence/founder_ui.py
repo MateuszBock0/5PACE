@@ -9,7 +9,7 @@ from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
 from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes,brief_criteria,WORKFLOW_EXAMPLES,search_companies,short_reason,relationship_lane,commercial_summary
 from excel_archive import download_analysis
-from founder import strategic_map_cohort,map_exclusions,DEFAULT_MAP_SCOPE,MAP_SCOPES
+from founder import strategic_map_cohort,map_exclusions,DEFAULT_MAP_SCOPE,MAP_SCOPES,SPACE_WATCH
 from threat_watch import exposure,spread_points,short_criterion,selected_criteria,threat_cohort,exposure_records,headline_records,material_pairs,priority_records
 from decision import CUSTOMER_LANES,FUNCTION_LANES,company_brief,differentiation_questions,signals,importance_lane
 
@@ -44,30 +44,58 @@ def chart_route(st,key,data,kind):
         reference=d[2] if kind=="record" and len(d)>2 else None
         navigate(st,pid,value(p,"Company ID"),criterion=criterion,register="Comparison Assessment" if reference else None,reference=reference)
 
+def reset_scope(st,key):
+    st.session_state[key]=DEFAULT_MAP_SCOPE
+    st.session_state.pop(key+"-custom",None)
+
+def choose_cohort(st,rows,key,label="Product scope"):
+    scope=st.selectbox(label,MAP_SCOPES,key=key)
+    st.button("Reset to default",key=key+"-reset",on_click=reset_scope,args=(st,key))
+    default=strategic_map_cohort(rows)
+    names=rows.set_index("Product ID").Product.to_dict()
+    if scope=="Custom selection":
+        ids=st.multiselect("Select products",list(names),default=default["Product ID"].tolist(),format_func=names.get,key=key+"-custom")
+        d=rows[rows["Product ID"].isin(ids)].copy()
+    else:d=strategic_map_cohort(rows,scope)
+    st.caption(f"{len(d)} of {len(rows)} products · default: ≥60% recorded overlap in any market OR ≥40% with Space AIT target/case evidence. Missing evidence is not non-support.")
+    if d.empty:st.info("No products meet this selected scope. Use Space Watch / research or All products to investigate; no fallback competitors are added.")
+    return scope,d
+
 def render_map(st,data,rows,key,compact=False):
     d=rows.copy()
-    d["X"]=d["Functional overlap"].map(dict(zip(FUNCTION_LANES,range(4)))).astype(float)
+    d["X"]=d["Recorded overlap fraction"].astype(float)*100
     d["Y"]=d["Customer position"].map(dict(zip(CUSTOMER_LANES,range(4)))).astype(float)
-    d=spread_points(d,reference=(3,2))
+    # Preserve exact horizontal percentage; separate only vertical display position.
+    d["Display Y"]=d.Y
+    for (x,y),g in d.groupby(["X","Y"]):
+        n=len(g)
+        if n>1 or (x==100 and y==2):
+            offsets=[.28*(2*i/max(1,n-1)-1) for i in range(n)] if n>1 else [.24]
+            if x==100 and y==2:offsets=[.12+.16*i/max(1,n-1) for i in range(n)]
+            for idx,offset in zip(g.sort_values("Product ID").index,offsets):d.loc[idx,"Display Y"]=y+offset
     fig=go.Figure()
-    fig.add_trace(go.Scatter(x=[3],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="top center",name="AIT-VISTA reference",customdata=[[VISTA]],marker=reference_marker(),hovertemplate="Declared scope / target; not market share<extra></extra>"))
+    fig.add_trace(go.Scatter(x=[100],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="top center",name="AIT-VISTA reference",customdata=[[VISTA]],marker=reference_marker(),hovertemplate="100% declared scope / target; not market share<extra></extra>"))
     if not d.empty:
-        rivals=px.scatter(d,x="Display X",y="Display Y",color="Role",color_discrete_map=role_colors(),hover_name="Product",custom_data=["Product ID"],hover_data={"Display X":False,"Display Y":False,"Functional overlap":True,"Customer position":True,"Customer basis":True,"Procurement":True})
+        rivals=px.scatter(d,x="X",y="Display Y",color="Role",color_discrete_map=role_colors(),hover_name="Product",custom_data=["Product ID"],hover_data={"X":":.2f","Display Y":False,"Core evidence coverage":":.1%","Core determinate coverage":":.1%","Customer position":True,"Customer basis":True,"Procurement":True})
         for tr in rivals.data:
             tr.update(marker=rival_marker(tr.name))
             fig.add_trace(tr)
-    fig.add_hrect(y0=-.45,y1=.45,fillcolor=tokens()["band"],line_width=0,layer="below")
-    fig.update_layout(height=340 if compact else 465,legend={"orientation":"h","y":-0.27,"font":{"size":10}},xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Some","Material","Broad"],"range":[-.5,3.5],"title":"Recorded functional overlap","automargin":True},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Adjacent sector","Space AIT target","Space AIT case"],"range":[-.5,3.5],"title":"Customer evidence","automargin":True},margin={"t":12,"b":95,"l":15,"r":15})
+    for y in range(4):
+        threshold=40 if y>=2 else 60
+        fig.add_shape(type="rect",x0=threshold,x1=100,y0=y-.46,y1=y+.46,fillcolor=tokens()["reference_fill"],line={"width":0},layer="below")
+        fig.add_shape(type="line",x0=threshold,x1=threshold,y0=y-.46,y1=y+.46,line={"color":tokens()["reference"],"width":1,"dash":"dot"})
+    fig.update_layout(height=390 if compact else 490,legend={"orientation":"h","y":-0.27,"font":{"size":10}},xaxis={"range":[-3,104],"tickvals":[0,20,40,60,80,100],"ticksuffix":"%","title":"Recorded overlap — eight fixed core criteria","automargin":True},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Adjacent sector","Space AIT target","Space AIT case"],"range":[-.5,3.5],"title":"Customer evidence","automargin":True},margin={"t":12,"b":95,"l":15,"r":15})
     render_chart(st,fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"product"),selection_mode="points")
-    if len(d)>0:
-        st.caption("Dense points: use the product selector below the chart as an exact-ID fallback; zoom to inspect nearby points.")
+    if not d.empty:
         dense=d.groupby(["X","Y"]).size()
         if (dense>1).any():
             with st.expander("Inspect co-located products by category"):
                 cells=[(x,y) for (x,y),n in dense.items() if n>1]
-                cell=st.selectbox("Shared category",cells,format_func=lambda v:FUNCTION_LANES[int(v[0])]+" / "+CUSTOMER_LANES[int(v[1])],key=key+"-cell")
+                cell=st.selectbox("Shared category",cells,format_func=lambda v:f"{v[0]:.2f}% / "+CUSTOMER_LANES[int(v[1])],key=key+"-cell")
                 select_product(st,d[(d.X==cell[0])&(d.Y==cell[1])],key+"-cell-product-"+str(cell),"Product in shared category")
-    st.caption("Select a product to open its profile. Customer-segment evidence is independent of functional overlap; shared procurement remains unresolved. Positions are categories, not scores or market share. Display-only offsets separate co-located products; full names and categories appear on hover. Marker size is visual emphasis.")
+        with st.expander("Exact scores and evidence coverage"):
+            table(st,d[["Company","Product","Recorded overlap fraction","Core evidence coverage","Core determinate coverage","Customer position"]].assign(**{c:d[c].map(lambda v:f"{v:.2%}") for c in ["Recorded overlap fraction","Core evidence coverage","Core determinate coverage"]}),key+"-score")
+    st.caption("Score = (full + 0.5 × partial) / 8. Recorded evidence coverage = active pairs / 8; determinate coverage = full, partial or explicitly unsupported / 8. 0% is not proof of non-support. Shading marks eligibility, not risk; vertical offsets are display-only. Shared procurement is unresolved.")
 
 def open_profile(st,pid,cid,key):
     st.button("Open profile",key="open-"+key,on_click=navigate,args=(st,pid,cid))
@@ -280,16 +308,10 @@ def positioning(st,data,cfg,rows):
     st.header("Market Positioning")
     st.caption("Which products address similar AIT workflows and have credible space-market relevance?")
     if rows.empty:return
-    f=priority_families(rows)
-    scope=st.selectbox("Market map scope",MAP_SCOPES+["Custom selection"],key="market-map-scope")
-    candidates=strategic_map_cohort(rows,scope)
+    scope,d=choose_cohort(st,rows,"market-map-scope","Market map scope")
     names=rows.set_index("Product ID").Product.to_dict()
-    default=strategic_map_cohort(rows)["Product ID"].tolist()
-    if scope=="Custom selection":
-        ids=st.multiselect("Products on strategic map",list(names),default=default,format_func=names.get,key="market-custom-products")
-    else:ids=candidates["Product ID"].tolist()
+    ids=d["Product ID"].tolist()
     st.session_state["founder-map-products"]=ids
-    d=rows[rows["Product ID"].isin(ids)].copy()
     render_map(st,data,d,"founder-map")
     st.caption(f"{len(d)} of {len(rows)} product records shown. Hidden products are not assessed as low threat.")
     if d.empty:return
@@ -302,7 +324,8 @@ def positioning(st,data,cfg,rows):
     criteria=registry(data,CRITERIA,"Criterion ID")
     stages={c:label for label,c in WORKFLOW_EXAMPLES if c in criteria}
     if stages:
-        workflow_ids=st.multiselect("Workflow products",ids,default=ids[:6],format_func=names.get,key="workflow-products-"+str(scope))
+        workflow_ids=ids
+        st.caption("Workflow uses the same selected market cohort.")
         heatmap(st,data,cfg,d[d["Product ID"].isin(workflow_ids)],"workflow",list(stages),stage_labels=stages)
         st.caption("Selected criterion examples by workflow stage, not proof of complete or integrated stage coverage.")
     else:
@@ -311,12 +334,9 @@ def positioning(st,data,cfg,rows):
 def advantage(st,data,cfg,rows):
     st.header("Competitive Advantage")
     if rows.empty:return
-    f=priority_families(rows)
-    candidates=f[f.Order<4]
-    default=threat_cohort(data,rows)["Product ID"].tolist()
-    names=rows.set_index("Product ID").Product.to_dict()
-    ids=st.multiselect("Competitors to benchmark",list(names),default=default,format_func=names.get,key="founder-adv-products")
-    selected=rows[rows["Product ID"].isin(ids)]
+    scope,selected=choose_cohort(st,rows,"adv-cohort-scope","Benchmark scope")
+    ids=selected["Product ID"].tolist()
+    st.session_state["founder-adv-products"]=ids
     if selected.empty:st.info("Select competitors.");return
     st.subheader("Strategic capability heatmap")
     tax=taxonomy(data,cfg)
@@ -327,7 +347,7 @@ def advantage(st,data,cfg,rows):
     if order=="Name":cids=sorted(cids,key=lambda c:value(registry(data,CRITERIA,"Criterion ID")[c],"Product criterion"))
     heatmap(st,data,cfg,selected,"advantage",cids)
     st.subheader("Response priority map")
-    response_view(st,data,cfg,selected,"adv-response")
+    response_view(st,data,cfg,selected,"adv-response",cids)
     st.subheader("Differentiation portfolio")
     d=advantage_summary(data,cfg,ids)
     if d.empty:st.info("No comparable evidence.");return
@@ -427,16 +447,15 @@ def response_view(st,data,cfg,rows,key,cids=None):
         st.button("Open exact criterion evidence",key=key+"-open",on_click=navigate,args=(st,r["Product ID"],value(p,"Company ID"),"Competitor Explorer",c,"Comparison Assessment",r["Comparison ID"]))
     with st.expander("All response recommendations"):table(st,e[["Short criterion","Product","Verdict","Evidence","Importance","Action","Next decision"]],key+"-table",True)
 
-def threat_view(st,data,cfg,rows,before=None):
+def threat_view(st,data,cfg,rows,before=None,selected=None):
     st.subheader("Threat Watch")
-    cohort=threat_cohort(data,rows)
-    names=rows.set_index("Product ID").Product.to_dict()
-    ids=st.multiselect("Threat Watch products",list(names),default=cohort["Product ID"].tolist(),format_func=names.get,key="threat-products")
-    selected=rows[rows["Product ID"].isin(ids)]
+    if selected is None:selected=strategic_map_cohort(rows)
+    ids=selected["Product ID"].tolist()
+    st.session_state["threat-products"]=ids
     all_criteria=list(registry(data,CRITERIA,"Criterion ID"))
     cids=all_criteria if st.checkbox("All 34 criteria",key="threat-all") else selected_criteria(data)
     st.caption(f"{len(ids)} of {len(rows)} products · {len(cids)} criteria across headlines, heatmap and response map. Provisional review order, not a threat probability.")
-    if selected.empty:return
+    if selected.empty:st.info("No competitors in this cohort; switch scope above to investigate.");return
     with st.expander("Products outside this Threat Watch cohort"):
         table(st,rows[~rows["Product ID"].isin(ids)][["Company","Product","Role"]],"threat-omitted")
     records=exposure_records(data,cfg,ids,cids)
@@ -474,42 +493,25 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     st.header("Competitive Command Centre")
     st.caption("What should 5PACE pay attention to today?")
     if rows.empty:st.info("No product records yet.");return
-    f=priority_families(rows)
     stamp=next((x[1] for x in snapshots if x[0]==current),"Not captured")
     st.caption("Snapshot capture: "+("Synthetic demo (not stored)" if demo else stamp))
-    cards=st.columns(4)
-    visual=f[f.Order==0]
-    tech=f[f.Order.isin([0,2])].sort_values(["Recorded overlap fraction","Technical or stronger"],ascending=False)
-    target=visual[visual["Customer position"].isin(CUSTOMER_LANES[2:])]
-    lead=tech.head(1)
-    market=target[~target["Family ID"].isin(lead["Family ID"])]
-    groups=[("Visual technology benchmark",lead,"Highest recorded overlap in selected visual / adjacent roles"),
-            ("Market-facing visual candidates",market,"Recorded spacecraft target customers; adoption may be unresolved"),
-            ("Budget substitution candidates",f[f.Order==1],"Workflow / purchasing alternatives; same budget unconfirmed"),
-            ("Research / emerging watch",f[f.Role=="Research / emerging entrant"],"Research demonstrators and potential entrants; commercial offer unconfirmed")]
-    for col,(title,g,caption) in zip(cards,groups):
-        with col:
-            with st.container(border=True):
-                st.caption(title)
-                st.markdown("**"+(" · ".join(g.Company.drop_duplicates().head(1)) if not g.empty else "Unresolved")+"**")
-                st.caption(caption)
-                if not g.empty:
-                    first=g.iloc[0]
-                    st.caption("Uncertainty: "+("Commercial offer" if title.startswith("Research") else "Shared buyer / actual scope"))
-                    st.caption("Action: "+("Benchmark workflow" if title.startswith("Visual") else "Verify procurement" if title.startswith("Budget") else "Verify deployment and scope"))
-                    open_profile(st,first["Product ID"],first["Company ID"],"strategic-card-"+title)
+    scope,mapped=choose_cohort(st,rows,"landing-map-scope","Strategic cohort")
+    st.session_state["landing-products"]=mapped["Product ID"].tolist()
     st.subheader("Technology × customer positioning")
-    scope=st.selectbox("Map scope",MAP_SCOPES,key="landing-map-scope")
-    mapped=strategic_map_cohort(rows,scope)
     render_map(st,data,mapped,"landing-map",True)
     if not mapped.empty:select_product(st,mapped,"landing-map-fallback","Inspect mapped product")
-    st.caption(f"{len(mapped)} of {len(rows)} product records shown. Default: Space AIT case OR Space AIT target OR material OR broad functional overlap. No role, family or rank exclusion. Hidden does not mean low threat.")
     with st.expander("Why are other products not on this map?"):
         excluded=map_exclusions(rows,mapped,scope)
         if excluded.empty:st.caption("All products are included.")
         else:
             table(st,excluded[["Company","Product","Role","Reason not shown"]],"map-exclusions")
             select_product(st,excluded,"excluded-map")
+    watch=strategic_map_cohort(rows,SPACE_WATCH)
+    with st.expander("Separate Space Watch / research — outside strategic core"):
+        if watch.empty:st.caption("No additional space/research products.")
+        else:
+            table(st,watch[["Company","Product","Customer position","Recorded overlap fraction"]].assign(**{"Recorded overlap fraction":watch["Recorded overlap fraction"].map(lambda v:f"{v:.2%}")}),"space-watch")
+            select_product(st,watch,"space-watch")
     prior=None
     if not demo:
         stamps=[s[0] for s in snapshots]
@@ -517,12 +519,12 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
             try:
                 with connect() as conn:prior=read_snapshot(conn,stamps[stamps.index(current)+1])
             except (ValueError,OSError):pass
-    threat_view(st,data,cfg,rows,prior)
+    threat_view(st,data,cfg,rows,prior,mapped)
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")
-        items=pd.concat([g.head(2) for _,g,_ in groups]).drop_duplicates("Family ID").head(7)
-        if items.empty:items=f.head(4)
+        items=mapped
+        if items.empty:st.caption("No products in the selected strategic cohort.")
         for _,r in items.iterrows():
             with st.container(border=True):
                 a,b=st.columns([3,1])
@@ -553,8 +555,7 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         st.button("Intelligence Monitor",on_click=navigate,args=(st,None,None,"Intelligence Monitor"),key="landing-monitor")
     st.caption("Qualitative review order, not a calibrated threat score. Full rationale, source dates and unresolved questions are in each profile.")
     st.subheader("Where we may differentiate")
-    families=f[(f.Order<3)|(f.Role=="Research / emerging entrant")]["Family ID"].tolist()
-    candidates=rows[rows["Family ID"].isin(families)]["Product ID"].tolist()
+    candidates=mapped["Product ID"].tolist()
     if candidates and registry(data,CRITERIA,"Criterion ID"):
         d=advantage_summary(data,cfg,candidates)
         if not d.empty:

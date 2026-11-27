@@ -32,15 +32,36 @@ def test_record_specific_evidence_level():
     assert e["Comparison ID"]=="CMP-STRONG"
     assert e.Evidence=="Official technical documentation"
 
-def test_axis_union_all_16_combinations_and_no_family_or_role_filter():
-    from founder import strategic_map_cohort,DEFAULT_MAP_SCOPE,map_exclusions
-    from decision import CUSTOMER_LANES,FUNCTION_LANES
-    d=pd.DataFrame([{"Product ID":f"{i}-{j}","Family ID":"same","Role":"Unresolved role","Order":4,"Customer position":y,"Functional overlap":x} for i,y in enumerate(CUSTOMER_LANES) for j,x in enumerate(FUNCTION_LANES)])
+def test_40_60_boundary_and_no_family_or_role_filter():
+    from founder import strategic_map_cohort,DEFAULT_MAP_SCOPE,map_exclusions,eligible,SPACE_WATCH
+    from decision import CUSTOMER_LANES
+    for y in CUSTOMER_LANES:
+        assert eligible(.3999,y)==False
+        assert eligible(.4,y)==(y in CUSTOMER_LANES[2:])
+        assert eligible(.5999,y)==(y in CUSTOMER_LANES[2:])
+        assert eligible(.6,y)
+    assert not eligible(.4,"Space offering")
+    d=pd.DataFrame([{"Product ID":f"{i}-{j}","Family ID":"same","Role":"Research / emerging entrant","Order":4,"Customer position":y,"Recorded overlap fraction":x} for i,y in enumerate(CUSTOMER_LANES) for j,x in enumerate([.3999,.4,.5999,.6])])
     included=strategic_map_cohort(d,limit=0)
-    assert len(included)==12
-    assert set(included["Product ID"])=={f"{i}-{j}" for i in range(4) for j in range(4) if i>=2 or j>=2}
-    assert len(map_exclusions(d,included,DEFAULT_MAP_SCOPE))==4
+    assert set(included["Product ID"])=={f"{i}-{j}" for i in range(4) for j in range(4) if j==3 or (i>=2 and j>=1)}
+    assert len(map_exclusions(d,included,DEFAULT_MAP_SCOPE))==8
     assert len(strategic_map_cohort(d,"All products"))==16
+    assert not set(strategic_map_cohort(d,SPACE_WATCH)["Product ID"])&set(included["Product ID"])
+
+def test_fixed_eight_core_score_and_missing_evidence():
+    import copy
+    from founder import summaries,CORE_IDS
+    d=comparison_fixture()
+    r=d["Comparison Assessment"]["rows"][0]
+    d["Comparison Assessment"]["rows"]=[dict(r,**{"Comparison ID":f"X{i}","Criterion ID":c,"Verdict":v}) for i,(c,v) in enumerate(zip(CORE_IDS,["Supported","Supported","Supported","Partially supported","Partially supported","Unknown","Announced","Explicitly unsupported"]))]
+    # Add the actual criterion registry so ledger validation recognises IDs.
+    base=d["AIT-VISTA Capabilities"]["rows"][0]
+    d["AIT-VISTA Capabilities"]["rows"]=[dict(base,**{"Criterion ID":c}) for c in CORE_IDS]
+    s=summaries(d).set_index("Product ID")
+    assert s.loc["DEMO-P1","Recorded overlap fraction"]==.5
+    assert s.loc["DEMO-P1","Core evidence coverage"]==1
+    assert s.loc["DEMO-P1","Core determinate coverage"]==.75
+    assert s.loc["DEMO-P2","Recorded overlap fraction"]==0
 
 def test_record_priorities_preserve_alternate_evidence_and_disputes():
     import copy

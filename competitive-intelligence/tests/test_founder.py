@@ -32,3 +32,19 @@ def test_founder_navigation(monkeypatch,tmp_path):
     for page in ["Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Command Centre"]:
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception,f"{page}: {app.exception}"
+
+def test_profile_strengths_and_commercial_changes():
+    import copy
+    from founder import profile_findings, recorded_market_changes
+    d=comparison_fixture()
+    f=profile_findings(d,{},"DEMO-P2")
+    assert f["Documented relative functional differences"]
+    d["Comparison Assessment"]["rows"][1]["Evidence level"]="Vendor claim"
+    f=profile_findings(d,{},"DEMO-P2")
+    assert not f["Documented relative functional differences"]
+    assert f["Potential differences — weaker evidence"]
+    b=copy.deepcopy(d)
+    b["Products"]["rows"][0]["Commercial Status"]="Commercial"
+    c=recorded_market_changes(d,b)
+    assert c.iloc[0]["Recorded change"]=="Commercial Status"
+    assert "not established" in c.iloc[0].Interpretation

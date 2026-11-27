@@ -1,7 +1,7 @@
 """Decision-oriented summaries of existing source evidence. No source mutation."""
 import re
 import pandas as pd
-from core import value
+from core import value, split_ids
 from analytics import EVIDENCE_RANK
 from command_engine import registry,direct_current,direct_matrix,profile,comparison_changes,ASSESS
 from competitive_roles import classify,family_root
@@ -66,10 +66,17 @@ def priority_families(rows):
 def profile_records(data,pid):
     p=registry(data,"Products","Product ID").get(pid,{})
     cid=value(p,"Company ID")
-    return {"Deployments":related(data,"Deployments",pid),"Commercial Intelligence":related(data,"Commercial Intelligence",pid),
-            "Observations":[r for r in data.get("Observations",{}).get("rows",[]) if value(r,"Company ID")==cid],
-            "Key Competitors":[r for r in data.get("Key Competitors",{}).get("rows",[]) if value(r,"Company / project")==value(registry(data,"Companies","Company ID").get(cid,{}),"Company Name")],
-            "Comparison Assessment":related(data,ASSESS,pid),"Capability Assessment":related(data,"Capability Assessment",pid)}
+    direct=related(data,ASSESS,pid);market=related(data,"Capability Assessment",pid)
+    deployments=related(data,"Deployments",pid);commercial=related(data,"Commercial Intelligence",pid)
+    referenced=[p]+direct+market+deployments+commercial
+    obsids={i for r in referenced for i in split_ids(r.get("Related Observation IDs"))}
+    evids={i for r in referenced for i in split_ids(r.get("Related Evidence IDs"))}
+    observations=[r for r in data.get("Observations",{}).get("rows",[]) if value(r,"Company ID")==cid or value(r,"Observation ID") in obsids]
+    company=registry(data,"Companies","Company ID").get(cid,{})
+    aliases={value(company,"Company Name").casefold()}|{a.casefold() for a in split_ids(company.get("Alternative Names"))}
+    evidence=[r for r in data.get("Key Competitors",{}).get("rows",[]) if value(r,"Evidence ID") in evids or (value(r,"Company / project") and value(r,"Company / project").casefold() in aliases)]
+    return {"Deployments":deployments,"Commercial Intelligence":commercial,"Observations":observations,
+            "Key Competitors":evidence,"Comparison Assessment":direct,"Capability Assessment":market}
 
 def timeline(data):
     rows=[]
@@ -91,3 +98,35 @@ def advantage_summary(data,cfg,pids):
 def evidence_detail(data,pid,cid):
     active=direct_current(data).get((pid,cid),{})
     return active.get("status","Unassessed"),active.get("rows",[]),[r for r in related(data,ASSESS,pid) if value(r,"Criterion ID")==cid]
+
+def profile_findings(data,cfg,pid):
+    current=direct_current(data);criteria=registry(data,CRITERIA,"Criterion ID")
+    result={"Recorded competitor strengths":[],"Documented relative functional differences":[],"Potential differences — weaker evidence":[],"Priority questions":[]}
+    for c in strategic_criteria(data):
+        e=current.get((pid,c),{})
+        s=e.get("status","Unassessed");ours=profile(cfg,c,"As-Is")
+        name=value(criteria[c],"Product criterion")
+        basis=e.get("evidence","")
+        if s in POSITIVE:result["Recorded competitor strengths"].append(name+" — "+s+" ("+basis+")")
+        if s in {"Partially supported","Explicitly unsupported"} and ours=="Supported":
+            key="Documented relative functional differences" if EVIDENCE_RANK.get(basis,-1)>=3 else "Potential differences — weaker evidence"
+            result[key].append(name+" — "+s+" ("+basis+")")
+        elif s not in {"Supported","Partially supported","Explicitly unsupported","Not applicable"}:
+            result["Priority questions"].append("Verify "+name)
+    return result
+
+def recorded_market_changes(before,after):
+    """Recorded register changes, not inferred real-world event chronology."""
+    products=registry(after,"Products","Product ID")
+    rows=[]
+    for tab,key,fields in [("Products","Product ID",["Commercial Status","Competition Type","Space Industry Applicability","Target Customers","Deployment Architecture"]),("Deployments","Deployment ID",None),("Commercial Intelligence","Commercial Record ID",None)]:
+        old=registry(before,tab,key);new=registry(after,tab,key)
+        for ident,r in new.items():
+            if ident not in old: changed=["New recorded entry"]
+            else:
+                keys=fields or [k for k in r if k not in {"Integrity Check","Last Reviewed"}]
+                changed=[k for k in keys if value(r,k)!=value(old[ident],k)]
+            if changed:
+                pid=value(r,"Product ID")
+                rows.append({"Product ID":pid,"Product":value(products.get(pid,{}),"Product Name"),"Register":tab,"Record":ident,"Recorded change":"; ".join(changed),"Interpretation":"New or revised source knowledge; actual product change not established"})
+    return pd.DataFrame(rows,columns=["Product ID","Product","Register","Record","Recorded change","Interpretation"])

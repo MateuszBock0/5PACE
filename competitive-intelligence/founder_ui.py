@@ -6,14 +6,16 @@ from core import value,connect,read_snapshot
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
-from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail
+from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes
 from excel_archive import download_analysis
 
 PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
 
 def navigate(st,pid=None,cid=None,page="Competitor Explorer"):
     st.session_state["founder_workspace"]=page
-    if cid: st.session_state["founder_company"]=cid
+    if cid:
+        st.session_state["founder_company"]=cid
+        st.session_state["founder-search"]=""
     if pid: st.session_state["founder_product_pending"]=pid
 
 def open_profile(st,pid,cid,key):
@@ -36,10 +38,10 @@ def source_records(st,rows,key):
                 if u.startswith(("https://","http://")) and not any(ch.isspace() for ch in u) and u not in urls: urls.append(u)
     for i,u in enumerate(urls[:20]): st.link_button("Source "+str(i+1),u)
 
-def select_product(st,rows,key,label="Inspect product"):
+def select_product(st,rows,key,label="Inspect product",default=None):
     if rows.empty:return None
     names={r["Product ID"]:r["Company"]+" · "+r["Product"] for r in rows.to_dict("records")}
-    p=st.selectbox(label,list(names),format_func=names.get,key="pick-"+key)
+    p=st.selectbox(label,list(names),index=list(names).index(default) if default in names else 0,format_func=names.get,key="pick-"+key+("-"+default if default in names else ""))
     r=rows[rows["Product ID"]==p].iloc[0]
     open_profile(st,p,r["Company ID"],key)
     return p
@@ -66,17 +68,24 @@ def heatmap(st,data,cfg,rows,key,ids=None):
     labels=[value(criteria[c],"Product criterion") for c in ids]
     mat.loc[VISTA]=[profile(cfg,c,"As-Is") for c in ids]
     mat=mat.loc[[VISTA]+ps]
-    scale=[]
-    for i,col in enumerate(colors):scale.extend([[i/len(colors),col],[(i+1)/len(colors),col]])
-    text=mat.to_numpy().T
     marks={"Supported":"✓","Partially supported":"~","Explicitly unsupported":"×","Announced":"A","Disputed":"!","Not applicable":"N/A"}
-    fig=go.Figure(go.Heatmap(z=mat.apply(lambda s:s.map(code)).to_numpy().T,x=["AIT-VISTA"]+[names[p] for p in ps],y=labels,text=text,customdata=[[[p,c] for p in [VISTA]+ps] for c in ids],texttemplate="%{text}",zmin=-.5,zmax=len(colors)-.5,colorscale=scale,showscale=False,hovertemplate="%{x}<br>%{y}<br>%{text}<extra></extra>"))
-    fig.update_traces(text=[[marks.get(v,"?") for v in line] for line in text],hovertemplate="%{x}<br>%{y}<br>%{text}<extra></extra>")
-    fig.update_layout(height=max(350,42*len(ids)+100),yaxis={"autorange":"reversed"},margin={"l":15,"r":15,"t":15,"b":80})
-    st.plotly_chart(fig,use_container_width=True,key="heat-"+key)
-    st.caption("✓ Supported · ~ Partial · × Explicitly unsupported · ? Unknown/unassessed · ! Disputed · A Announced · N/A Not applicable. Vendor claims remain visible; inspect evidence before drawing conclusions.")
-    p=select_product(st,rows,key+"-profile","Inspect comparison product")
-    c=st.selectbox("Inspect criterion evidence",ids,format_func=lambda c:value(criteria[c],"Product criterion"),key="heat-c-"+key)
+    # Scatter-square heatmap enables native point selection and evidence drill-down.
+    cells=[(j,i,p,c,mat.loc[p,c]) for i,c in enumerate(ids) for j,p in enumerate([VISTA]+ps)]
+    current_labels=["AIT-VISTA"]+[names[p] for p in ps]
+    fig=go.Figure(go.Scatter(x=[v[0] for v in cells],y=[v[1] for v in cells],mode="markers+text",
+        marker={"symbol":"square","size":32,"color":[colors[code.get(v[4],1)] for v in cells]},
+        text=[marks.get(v[4],"?") for v in cells],textfont={"color":"white","size":14},textposition="middle center",
+        customdata=[[v[2],v[3],v[4],current_labels[v[0]],labels[v[1]]] for v in cells],
+        hovertemplate="%{customdata[3]}<br>%{customdata[4]}<br>%{customdata[2]}<extra></extra>"))
+    fig.update_layout(height=max(350,42*len(ids)+100),xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":current_labels,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
+    event=st.plotly_chart(fig,use_container_width=True,key="heat-"+key,on_select="rerun",selection_mode="points")
+    points=event.selection.points if event is not None and hasattr(event,"selection") else []
+    clicked=points[0].get("customdata",[]) if points else []
+    pc=clicked[0] if len(clicked)>1 and clicked[0] in ps else None
+    cc=clicked[1] if len(clicked)>1 and clicked[1] in ids else None
+    st.caption("Select a cell to inspect its evidence. ✓ Supported · ~ Partial · × Explicitly unsupported · ? Unknown/unassessed · ! Disputed · A Announced · N/A Not applicable. Vendor claims remain visible.")
+    p=select_product(st,rows,key+"-profile","Inspect comparison product",pc)
+    c=st.selectbox("Inspect criterion evidence",ids,index=ids.index(cc) if cc else 0,format_func=lambda c:value(criteria[c],"Product criterion"),key="heat-c-"+key+("-"+cc if cc else ""))
     if p:detail(st,data,p,c,key+"-evidence")
     with st.expander("Full comparison values"):
         table(st,mat.rename(index={VISTA:"AIT-VISTA",**names},columns=dict(zip(ids,labels))).rename_axis("Product").reset_index(),key+"-matrix",True)
@@ -121,6 +130,14 @@ def explorer(st,data,cfg,rows):
         for f in ["Primary Use Case","Target Customers","Target Industries","Deployment Architecture","Commercial Status","Space Industry Applicability"]:
             st.write("**"+f+":** "+(value(p,f) or "Not recorded"))
     if value(p,"Product URL").startswith(("https://","http://")):st.link_button("Product website",value(p,"Product URL"))
+    findings=profile_findings(data,cfg,pid)
+    with st.expander("Strategic strengths, differences and unresolved questions",expanded=True):
+        for heading,items in findings.items():
+            st.markdown("**"+heading+"**")
+            if items:
+                for item in items: st.write("• "+item)
+            else: st.caption("None established in the strategic comparison set.")
+        st.caption("Partial support is a categorical scope difference, not measured performance. Weak evidence does not establish a competitor weakness.")
     records=profile_records(data,pid)
     tabs=st.tabs(["Portfolio & commercial","Head-to-head","Evidence & developments"])
     with tabs[0]:
@@ -224,6 +241,16 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
     t["Product"]=t["Product ID"].map(lambda p:value(pro.get(p,{}),"Product Name"))
     types=st.multiselect("Development types",list(t["Date basis"].unique()),default=list(t["Date basis"].unique()),key="monitor-types")
     filtered=t[t["Date basis"].isin(types)]
+    plot=filtered.copy()
+    plot["Parsed date"]=pd.to_datetime(plot.Date,format="mixed",errors="coerce",utc=True)
+    plot=plot[plot["Parsed date"].notna()].head(100)
+    if not plot.empty:
+        fig=px.scatter(plot,x="Parsed date",y="Company",color="Date basis",hover_name="Product",custom_data=["Product ID","Company ID"],hover_data=["Date","Development"])
+        fig.update_layout(height=max(330,24*plot.Company.nunique()+120),xaxis_title="Recorded or reported date",yaxis_title="")
+        ev=st.plotly_chart(fig,use_container_width=True,key="monitor-timeline-plot",on_select="rerun",selection_mode="points")
+        pts=ev.selection.points if ev is not None and hasattr(ev,"selection") else []
+        click=pts[0].get("customdata",[]) if pts else []
+        if len(click)>1 and click[1] in names:open_profile(st,click[0] or None,click[1],"timeline-click")
     table(st,filtered[["Date","Date basis","Company","Product","Development","Strategic implication","Source"]].head(50),"timeline",True)
     if not rows.empty:select_product(st,rows,"timeline")
     st.caption("Dates are labelled by type. Assessment changes indicate recorded knowledge, not necessarily changes in the product.")
@@ -239,6 +266,12 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
                     ch["Product"]=ch["Product ID"].map(lambda p:value(pro.get(p,{}),"Product Name"))
                     table(st,ch,"recorded-changes",True)
                     select_product(st,rows[rows["Product ID"].isin(ch["Product ID"])],"changes")
+                st.subheader("Recorded commercial, deployment and positioning changes")
+                changes=recorded_market_changes(before,data)
+                if changes.empty:st.info("No new or revised commercial, deployment or selected positioning records.")
+                else:
+                    table(st,changes,"market-changes",True)
+                    select_product(st,rows[rows["Product ID"].isin(changes["Product ID"])],"market-changes")
     st.subheader("Research priorities")
     if not rows.empty and registry(data,CRITERIA,"Criterion ID"):
         stamp=next((s[1] for s in snapshots if s[0]==current),"")
@@ -269,8 +302,10 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
                 with b:open_profile(st,r["Product ID"],r["Company ID"],"landing-"+r["Product ID"])
         if len(group)>(4 if order<2 else 2):st.caption("More products are available in Competitor Explorer.")
     st.caption("Review order is role-based, then recorded overlap and evidence, not a probability of lost sales. All roles remain accessible. Source classifications are provisional.")
+    st.button("Open full company directory",on_click=navigate,args=(st,None,None,"Competitor Explorer"),key="landing-directory")
     st.subheader("Where we may differentiate")
-    candidates=f[f.Order<3]["Product ID"].tolist()
+    families=f[f.Order<3]["Family ID"].tolist()
+    candidates=rows[rows["Family ID"].isin(families)]["Product ID"].tolist()
     if candidates and registry(data,CRITERIA,"Criterion ID"):
         d=advantage_summary(data,cfg,candidates)
         if not d.empty:

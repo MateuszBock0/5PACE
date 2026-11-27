@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.9-rc1 — Company Portfolio Coverage
+
+- Second Command Centre chart: stacked best-product and incremental portfolio coverage for all registered companies.
+- Stable-ID union of eight criteria, portfolio-only review flag, evidence completeness, tied contributors and named-pair integration status.
+- Independent company filters, exact evidence drill-down and native strategic/combined PDF reporting.
+
 ## 1.4.8-rc1 — Scope separation and Space Priority
 
 - All-products main Command Centre map; secondary Market Positioning and analytical filters default to strategic core. Independent reset controls and explicit core labels.

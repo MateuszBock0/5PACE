@@ -52,6 +52,13 @@ def sample():
             ledger.append([f"DEMO-CMP-{k}-{j}",p,c,s,"Insufficient evidence" if s=="Unknown" else "Official technical documentation" if (k+j)%2 else "Vendor claim","Fictitious comparison for UI acceptance.","https://example.invalid/","","DEMO-O"+str(k),"","2026-11-27","","Synthetic fixture only",p+"|"+c,"OK"])
     d[ASSESS]=normalize_sheet(ASSESS,[FIELDS,*ledger])
     d[VIEW]=normalize_sheet(VIEW,[["Product ID","Company","Product",*ids],["","","",*[n for _,n in crit]],*[[f"DEMO-P{k}",companies[k-1][1],companies[k-1][2],*vs] for k,vs in enumerate(verdicts,1)]])
+    # 43-company fixture exercises long labels and zero-score points without private data.
+    for k in range(5,44):
+        cid="DEMO-CO-"+str(k);pid="DEMO-P"+str(k)
+        label="Example Long-Named Manufacturing Organisation "+str(k)
+        append("Companies",{"Company ID":cid,"Company Name":label,"Country":"Fictitious example"})
+        append("Products",{"Product ID":pid,"Company ID":cid,"Product Name":"Example unassessed product "+str(k),"Commercial Status":"Commercial","Product URL":"https://example.invalid/"})
+        append(VIEW,{"Product ID":pid,"Company":label,"Product":"Example unassessed product "+str(k),**{c:"Not assessed" for c in ids}})
     errors,warnings=validate(d)
     if errors:raise RuntimeError(str(errors))
     return d
@@ -127,7 +134,7 @@ def capture(out,live=False):
                         })""")
                         assert style["background"].lower()=="#141f30",style
                         assert style["firstSize"]==36 and style["rivals"],style
-                        assert set(style["ids"])=={"DEMO-P1","DEMO-P2","DEMO-P3","DEMO-P4"},style
+                        assert set(style["ids"])=={"DEMO-P"+str(k) for k in range(1,44)},style
                         assert "Example Robotics" in style["labels"],style
                         assert any(not s for s in style["labels"]),style
                         assert all("%" not in s for s in style["labels"]),style
@@ -138,6 +145,16 @@ def capture(out,live=False):
                         page.set_viewport_size({"width":width,"height":height});page.wait_for_timeout(500)
                         top();shot("Landing_"+str(width)+"x"+str(height))
                     page.set_viewport_size({"width":1600,"height":1080});page.wait_for_timeout(500)
+                    section("Company Portfolio Coverage");shot("10_Company_Portfolio")
+                    if not live:
+                        portfolio=page.locator(".js-plotly-plot").nth(1)
+                        portfolio.wait_for(timeout=20000)
+                        info=portfolio.evaluate("""gd=>({bg:gd._fullLayout.plot_bgcolor,bars:gd.data.filter(t=>t.type==="bar").length,ids:gd.data[0].customdata.map(d=>d[0]),second:gd.data[0].customdata[1]})""")
+                        assert info["bg"].lower()=="#141f30" and info["bars"]==2 and len(set(info["ids"]))==43,info
+                        portfolio.screenshot(path=str(out/"11_Company_Portfolio_Full.png"))
+                        portfolio.locator(".barlayer .trace .point path").nth(1).click(force=True)
+                        page.get_by_text(info["second"][1]+" — "+info["second"][9],exact=True).wait_for(timeout=15000)
+                        assert page.get_by_text("Eight criterion attribution",exact=True).count()==1
                     section("Threat Watch");shot("09_Threat_Watch")
                     top()
                     def map_point(pid,criterion=None,plot_index=0):
@@ -210,7 +227,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.8 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.9 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

@@ -44,6 +44,11 @@ def run():
             assert set(strategic_map_cohort(rows,"All products")["Product ID"])==set(products)
             assert set(app.session_state["landing-products"])==set(products)
             assert set(app.session_state["threat-products"])==expected
+            from company_portfolio import portfolio_data
+            pf,pdets=portfolio_data(data,rows)
+            assert set(app.session_state["portfolio-company-ids"])==set(rows["Company ID"])
+            assert (pf["Portfolio coverage"]>=pf["Best single product coverage"]).all()
+            assert (pf["Portfolio coverage"]<=1).all()
             app.selectbox(key="landing-map-scope").set_value(DEFAULT_MAP_SCOPE).run();check("Map scope independence")
             assert set(app.session_state["landing-products"])==expected and set(app.session_state["threat-products"])==expected
             app.button(key="landing-map-scope-reset").click().run();check("Map reset independence")
@@ -53,7 +58,7 @@ def run():
             assert not q.duplicated(["Product ID","Criterion ID"]).any()
             companies=registry(data,"Companies","Company ID")
             report={"Snapshot hash":h,"Capture UTC":snap[1],"Source":snap[2],"Mode":mode,
-                    "Validation errors":errors,"Validation warnings":warnings,"Default map eligible IDs":sorted(expected),"All product IDs":sorted(products),"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
+                    "Validation errors":errors,"Validation warnings":warnings,"Default map IDs":sorted(products),"Strategic core IDs":sorted(expected),"Portfolio companies":len(pf),"Portfolio-only exposure":pf[pf["Portfolio flag"]=="Portfolio-only exposure"]["Company ID"].tolist(),"All product IDs":sorted(products),"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
             for name in ["Connektica","Rapta","Dheera","iLEAN","AI4AIT"]:
                 ids=[c for c in search_companies(data,name) if core.value(companies[c],"Company Name").casefold()==name.casefold() or (name=="AI4AIT" and core.value(companies[c],"Company Name").casefold().startswith("ai4ait"))]
                 if len(ids)!=1:raise RuntimeError("Profile missing or ambiguous: "+name)

@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 from core import value,connect,read_snapshot,digest
 from space_research import priority_queue
+from portfolio_ui import portfolio_view
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
@@ -528,6 +529,7 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         else:
             table(st,excluded[["Company","Product","Role","Reason not shown"]],"map-exclusions")
             select_product(st,excluded,"excluded-map")
+    portfolio_view(st,data,rows,navigate,table)
     watch=strategic_map_cohort(rows,SPACE_WATCH)
     with st.expander("Separate Space Watch / research — outside strategic core"):
         if watch.empty:st.caption("No additional space/research products.")

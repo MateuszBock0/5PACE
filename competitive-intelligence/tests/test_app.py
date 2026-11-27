@@ -23,8 +23,9 @@ def test_workspaces_with_mapping(monkeypatch,tmp_path):
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=40)
     app.run()
     assert not app.exception
+    app.sidebar.radio[0].set_value("Advanced Analytics").run()
     for page in ["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Excel Archive","Synchronisation"]:
-        app.sidebar.radio[0].set_value(page).run()
+        app.sidebar.radio[1].set_value(page).run()
         assert not app.exception, f"{page}: {app.exception}"
 
 def test_command_workspaces(monkeypatch,tmp_path):
@@ -36,6 +37,8 @@ def test_command_workspaces(monkeypatch,tmp_path):
     monkeypatch.setattr(core,"connect",lambda:original(db))
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=40).run()
     assert not app.exception
+    app.sidebar.radio[0].set_value("Advanced Analytics").run()
+    next(r for r in app.sidebar.radio if r.label=="Advanced workspace").set_value("Command Centre").run()
     for view in ["Executive dashboard","Market Positioning","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"]:
         next(r for r in app.radio if r.label=="Command workspace").set_value(view).run()
         assert not app.exception, f"{view}: {app.exception}"
@@ -49,6 +52,8 @@ def test_positioning_workspaces(monkeypatch,tmp_path):
     with original(db) as conn: core.store(conn,comparison_fixture())
     monkeypatch.setattr(core,"connect",lambda:original(db))
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=45).run()
+    app.sidebar.radio[0].set_value("Advanced Analytics").run()
+    next(r for r in app.sidebar.radio if r.label=="Advanced workspace").set_value("Command Centre").run()
     next(r for r in app.radio if r.label=="Command workspace").set_value("Market Positioning").run()
     assert not app.exception
     for view in ["Positioning map","Capability profile","Competitive proximity","Company portfolios","Advantage portfolio","Evidence sensitivity","Workflow differentiation","Methodology & settings"]:

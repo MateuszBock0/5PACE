@@ -79,10 +79,10 @@ def render_map(st,data,rows,key,compact=False):
     if not d.empty:
         core=set(strategic_map_cohort(d)["Product ID"])
         label_all=st.checkbox("Show all company labels",key=key+"-labels")
-        d["Visible label"]=[f'{r.Company} · {r["X"]:.2f}%' if label_all or r["Product ID"] in core else "" for _,r in d.iterrows()]
-        rivals=px.scatter(d,x="X",y="Display Y",color="Role",color_discrete_map=role_colors(),text="Visible label",hover_name="Product",custom_data=["Product ID"],hover_data={"X":":.2f","Display Y":False,"Core evidence coverage":":.1%","Core determinate coverage":":.1%","Customer position":True,"Customer basis":True,"Procurement":True})
+        d["Visible label"]=[r.Company if label_all or r["Product ID"] in core else "" for _,r in d.iterrows()]
+        rivals=px.scatter(d,x="X",y="Display Y",color="Role",color_discrete_map=role_colors(),text="Visible label",hover_name="Product",custom_data=["Product ID"],hover_data={"Company":True,"Visible label":False,"X":":.2f","Display Y":False,"Core evidence coverage":":.1%","Core determinate coverage":":.1%","Customer position":True,"Customer basis":True,"Procurement":True})
         for tr in rivals.data:
-            tr.update(marker=rival_marker(tr.name),textposition="top center",textfont={"size":12,"color":tokens()["text"]},cliponaxis=False)
+            tr.update(marker=rival_marker(tr.name),textposition="top center",textfont={"size":10,"color":tokens()["text"]},cliponaxis=False)
             fig.add_trace(tr)
     for y in range(4):
         threshold=40 if y>=2 else 60

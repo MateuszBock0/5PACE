@@ -127,7 +127,9 @@ def capture(out,live=False):
                         assert style["background"].lower()=="#141f30",style
                         assert style["firstSize"]==36 and style["rivals"],style
                         assert set(style["ids"])=={"DEMO-P1","DEMO-P2","DEMO-P3","DEMO-P4"},style
-                        assert any("Example Robotics" in s for s in style["labels"]),style
+                        assert "Example Robotics" in style["labels"],style
+                        assert any(not s for s in style["labels"]),style
+                        assert all("%" not in s for s in style["labels"]),style
                         assert all(r["size"]==12 and r["opacity"]==1 and r["width"]>=1.5 for r in style["rivals"]),style
                     shot("01_Command_Centre")
                     for width,height in [(1280,800),(1920,1080)]:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0-rc1 — Database alignment
+
+- Provisional role classification with source rationale and explicit product-family grouping; no source label dictates threat rank.
+- Threat exposure intervals sorted by upper then lower; research priorities remain separate.
+- Interactive landscape selection, individual evidence inspection, head-to-head comparison and family-deduplicated differentiation metrics.
+- Complete research queue CSV follows the eight-field contract, including selected snapshot capture date and existing evidence IDs.
+- No new worksheets or source mutations. Functional baseline remains owner-declared; customer demand and measured operational performance are separate.
+
 ## 1.1.1-rc1 — Owner-declared AIT-VISTA baseline
 
 - Default As-Is comparison treats listed criteria as implemented, without requesting implementation evidence.

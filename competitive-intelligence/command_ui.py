@@ -3,11 +3,12 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from core import value, connect, read_snapshot
+from competitive_roles import classify, family_watchlist
 from advanced_ui import save_settings
 from analytics import matrix, DISPLAY
 from product_intelligence import criterion_matrix, CRITERIA, mappings
 from command_engine import (ASSESS, VIEW, registry, direct_matrix, direct_current, matrix_audit,
-    profile, scope_ids, threat_table, advantages, research_queue, comparison_changes, overlap_history, BASE_STATES, MATURITY, SCOPE)
+    profile, scope_ids, threat_table, advantages, research_queue, comparison_changes, overlap_history, head_to_head, BASE_STATES, MATURITY, SCOPE)
 
 def table(st,df,key):
     st.dataframe(df,use_container_width=True,hide_index=True)
@@ -35,12 +36,13 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
     if audit:
         st.warning(f"Derived comparison matrix has {len(audit)} discrepancy notices. Ledger remains authoritative; inspect before relying on the affected results.")
         with st.expander("Source matrix cross-check"): st.write(audit[:100])
-    roles=sorted({value(r,"Competition Type") or "Unclassified" for r in products.values()})
-    default_roles=[x for x in ["Direct","Adjacent / substitute","Potential entrant"] if x in roles] or roles
+    classifications={p:classify(r) for p,r in products.items()}
+    roles=sorted({r["Analytical role"] for r in classifications.values()})
+    default_roles=roles
     left,right=st.columns(2)
     mode=left.radio("AIT-VISTA comparison baseline",["As-Is","MVP","Target"],horizontal=True,key="cmd-mode")
     selected_roles=right.multiselect("Competitor cohort",roles,default=default_roles,key="cmd-roles")
-    ids=[p for p,r in products.items() if (value(r,"Competition Type") or "Unclassified") in selected_roles]
+    ids=[p for p in products if classifications[p]["Analytical role"] in selected_roles]
     if mode=="As-Is": st.caption("AIT-VISTA listed criteria are treated as implemented, as declared by the product owner. Competitor evidence uncertainty remains explicit.")
     else: st.info("Target/MVP are optional planning scenarios; As-Is is the default product baseline.")
     view=st.radio("Command workspace",["Executive dashboard","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"],horizontal=True,key="cmd-view")
@@ -52,7 +54,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
     if not scope: st.warning("No established criteria in this baseline. Configure the local product baseline. Unknown scope is not scored.")
     threat_weights=dict(cfg.get("commercial_weights",{}))
     with st.expander("Threat scenario weights and interpretation"):
-        st.caption("Ordinal evidence scenario, not a calibrated threat probability. Source role determines review group; lower bound orders within group. Missing evidence retains uncertainty. Partial support = 0.5. Space relevance, commercial status and documented adoption are proxies, not market share.")
+        st.caption("Ordinal evidence scenario, not a calibrated threat probability. Ranking is by upper exposure, then lower exposure, within the selected cohort, not source role. Missing evidence retains uncertainty. Roles are provisional interpretations of recorded metadata. Partial support = 0.5. Space relevance, commercial status and documented adoption are proxies, not market share.")
         for k in ["Functional overlap","Space relevance","Commercial availability","Documented adoption"]:
             threat_weights[k]=st.slider(k,0,10,int(threat_weights.get(k,3)),key="cmd-w-"+k)
         if not any(threat_weights.values()) or not any(threat_weights[k] for k in threat_weights if k!="Functional overlap"):
@@ -62,37 +64,73 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
     av=advantages(data,allmat,cfg,mode) if ids else pd.DataFrame()
     if view=="Executive dashboard":
         if threat.empty: return
-        direct=threat[threat.Role=="Direct"]
         st.subheader("Who to watch first")
-        st.caption("Source-classified direct competitors take review priority; within each role order is the lower evidence-backed threat scenario bound, not definitive ranking.")
-        top=threat.head(12).copy()
-        top["Threat interval"]=top.apply(lambda r:f"{r['Threat lower']:.0%}–{r['Threat upper']:.0%}",axis=1)
-        top["Determinate scope"]=top["Known weight"].map(lambda v:f"{v:.0%}")
-        table(st,top[["Product","Company","Role","Threat interval","Determinate scope","Why watch","Review action"]],"watch-first")
+        st.caption("One entry per explicit product family. Upper scenario exposure first, then lower; broad intervals are unresolved, not low threats. Same-company products without explicit family links are not merged. The family interval is the maximum member bounds, not combined features.")
+        families=family_watchlist(threat)
+        families["Threat interval"]=families.apply(lambda r:f"{r['Family lower']:.0%}–{r['Family upper']:.0%}",axis=1)
+        candidates=families[families["Member tracks"].str.contains("Substitution candidates",regex=False)]
+        other=families[~families["Member tracks"].str.contains("Substitution candidates",regex=False)]
+        columns=["Product","Company","Family members","Member roles","Family attention","Threat interval","Why watch","Review action"]
+        st.markdown("**Substitution candidates — documented exposure**")
+        documented=candidates.sort_values(["Family lower","Family upper","Family ID"],ascending=[False,False,True])
+        if documented.empty: st.info("No substitution candidate in the selected cohort; classification may be incomplete.")
+        else: table(st,documented.head(12)[columns],"watch-documented")
+        st.markdown("**Substitution candidates — unresolved potential exposure**")
+        potential=candidates[candidates["Family attention"]=="Potential high exposure — unresolved"]
+        if potential.empty: st.info("No candidate crosses the selected uncertainty threshold.")
+        else: table(st,potential.head(12)[columns],"watch-potential")
+        with st.expander("Other roles and unresolved classification — monitor or investigate"):
+            table(st,other[columns],"watch-other")
+        top=candidates.head(12).copy() if not candidates.empty else families.head(12).copy()
+        st.caption("The documented view ranks lower bounds; the potential view ranks upper bounds. Neither is a calibrated threat ranking, and unresolved or non-substitution roles are not assumed harmless.")
+        with st.expander("All products and provisional classification rationale"):
+            table(st,threat.drop(columns=["Rank group"]),"all-threats")
+        st.caption("High scenario exposure convention: lower ≥ 65%; potential high exposure: upper ≥ 65% but lower below. This is not a probability or validated threshold. Family representative is the actual product with the largest upper bound, then lower bound; the member roles are shown separately.")
         st.subheader("Competitive landscape")
         d=threat.dropna(subset=["Overlap lower","Market lower"]).copy()
         d["Overlap uncertainty"]=(d["Overlap upper"]-d["Overlap lower"]).clip(lower=0)
         d["Market uncertainty"]=(d["Market upper"]-d["Market lower"]).clip(lower=0)
         if not d.empty:
             d["Zero"]=0.
-            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Role",hover_name="Product",hover_data=["Company","Product ID","Overlap upper","Market upper","Known weight","Commercial status","Space relevance","Why watch"],error_x="Overlap uncertainty",error_x_minus="Zero",error_y="Market uncertainty",error_y_minus="Zero")
+            fig=px.scatter(d,x="Overlap lower",y="Market lower",color="Analytical role",symbol="Commercial status",hover_name="Product",custom_data=["Product ID"],hover_data=["Company","Overlap upper","Market upper","Known weight","Space relevance","Why watch","Classification basis","Family ID"],error_x="Overlap uncertainty",error_x_minus="Zero",error_y="Market uncertainty",error_y_minus="Zero")
             fig.update_traces(marker={"size":10})
             fig.add_vline(x=.5,line_dash="dot");fig.add_hline(y=.5,line_dash="dot")
             fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%","title":"Functional scope overlap (lower bound + uncertainty)"},yaxis={"range":[0,1.05],"tickformat":".0%","title":"Commercial / space / adoption evidence (lower + uncertainty)"},height=550)
-            st.plotly_chart(fig,use_container_width=True)
-        st.subheader("Threat intervals — priority review cohort")
-        intervals(st,top,"Threat lower","Threat upper","Product","Weighted threat scenario")
+            event=st.plotly_chart(fig,use_container_width=True,on_select="rerun",selection_mode="points",key="cmd-landscape")
+            selected=event.selection.points if event is not None and hasattr(event,"selection") else []
+            clicked=selected[0].get("customdata",[]) if selected else []
+            chosen_pid=clicked[0] if clicked and clicked[0] in ids else None
+        else: chosen_pid=None
+        st.subheader("Inspect competitive position")
+        pid=st.selectbox("Select product (or select a point on the map)",ids,index=ids.index(chosen_pid) if chosen_pid else 0,format_func=names.get,key="cmd-map-inspect-"+(chosen_pid or "manual"))
+        st.write(classifications[pid])
+        st.write({k:value(products[pid],k) for k in ["Primary Use Case","Target Customers","Target Industries","Deployment Architecture","Product Family","Space Industry Applicability","Space Deployment Evidence","Related Observation IDs","Product URL","Notes"]})
+        table(st,head_to_head(data,allmat,cfg,pid,mode),"map-product-evidence")
+        with st.expander("Underlying comparison evidence and limitations"):
+            table(st,pd.DataFrame([r for r in data[ASSESS]["rows"] if value(r,"Product ID")==pid]),"map-product-ledger")
+        st.subheader("Threat intervals — family review cohort")
+        intervals(st,top,"Family lower","Family upper","Product","Weighted threat scenario")
         st.subheader("Where AIT-VISTA stands")
-        st.caption("Compared against best observed competitor in the chosen cohort. Missing evidence prevents definitive market-wide claims.")
+        st.caption("Compared against the best observed product in the chosen cohort. Shares are deduplicated by explicit family; missing evidence prevents definitive market-wide claims. Functional superiority is distinct from customer value and measured performance.")
         candidate=av[av["AIT-VISTA"]!="Not applicable"].copy()
         candidate["Existing positive verdicts"]=(candidate["Existing full support"]+candidate["Existing partial support"])/candidate["Eligible competitors"].replace(0,float("nan"))
         candidate["Unresolved share"]=candidate["Unresolved"]/candidate["Eligible competitors"].replace(0,float("nan"))
         if not candidate.empty:
             fig=go.Figure(go.Bar(x=candidate["Existing positive verdicts"],y=candidate["Criterion ID"],orientation="h",name="Observed positive verdicts",customdata=candidate[["Criterion","Assessment"]],hovertemplate="%{customdata[0]}<br>%{customdata[1]}<br>Positive: %{x:.0%}<extra></extra>"))
             fig.add_trace(go.Bar(x=candidate["Unresolved share"],y=candidate["Criterion ID"],orientation="h",name="Unresolved (possible overlap)",marker={"color":"#828b99"},hovertemplate="Unresolved: %{x:.0%}<extra></extra>"))
-            fig.update_layout(barmode="stack",xaxis={"range":[0,1],"tickformat":".0%","title":"Share of selected applicable competitors"},height=max(420,24*len(candidate)+100),title="Existing competition vs unresolved differentiation hypotheses")
+            fig.update_layout(barmode="stack",xaxis={"range":[0,1],"tickformat":".0%","title":"Share of selected applicable product families"},height=max(420,24*len(candidate)+100),title="Existing competition vs unresolved differentiation hypotheses")
             st.plotly_chart(fig,use_container_width=True)
-        table(st,av[["Criterion","AIT-VISTA","Assessment","Existing full support","Existing partial support","Unresolved","Demand"]],"position-summary")
+        table(st,av[["Criterion","AIT-VISTA","Assessment","Existing full support","Existing partial support","Unresolved","Demand","Customer importance (team estimate)","Operational performance comparison"]],"position-summary")
+        st.subheader("Next decisions")
+        actions=av[av["AIT-VISTA"]!="Not applicable"].copy()
+        actions["Next decision"]=actions.Assessment.map(lambda s:"Protect and validate customer value" if s.startswith("Functional advantage") else "Review development gap" if s=="Observed disadvantage" else "Validate performance and positioning" if "parity" in s else "Resolve competitor evidence before claiming differentiation")
+        actions["Importance"]=actions["Criterion ID"].map(weights)
+        actions["Decision urgency"]=actions.Assessment.map(lambda s:3 if s=="Observed disadvantage" else 2 if s.startswith("Functional advantage") or s.startswith("Potential disadvantage") else 1)
+        actions["Review priority"]=actions["Importance"]*actions["Decision urgency"]
+        actions=actions.sort_values(["Review priority","Criterion ID"],ascending=[False,True])
+        if not actions.empty:
+            st.plotly_chart(px.bar(actions.head(12).sort_values("Review priority"),x="Review priority",y="Criterion ID",color="Next decision",orientation="h",hover_name="Criterion",hover_data=["Assessment","Importance"],title="Decision review priority — heuristic, not implementation effort"),use_container_width=True)
+        table(st,actions[["Criterion ID","Criterion","Assessment","Next decision","Demand","Review priority"]],"next-decisions")
         actual=av.dropna(subset=["Delta lower","Delta upper"]).copy()
         if not actual.empty:
             fig=go.Figure(go.Scatter(x=actual["Delta lower"],y=actual.Criterion,mode="markers",error_x={"type":"data","symmetric":False,"array":actual["Delta upper"]-actual["Delta lower"],"arrayminus":[0]*len(actual)}))
@@ -117,9 +155,10 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         st.plotly_chart(fig,use_container_width=True)
         table(st,bm.rename(index=names,columns=labels).rename_axis("Product").reset_index(),"direct-matrix")
         pid=st.selectbox("Competitor profile",chosen,format_func=names.get,key="cmd-pid")
-        st.write({k:value(products[pid],k) for k in ["Competition Type","Strategic Priority","Primary Use Case","Target Customers","Commercial Status","Deployment Architecture","Space Industry Applicability","Product URL"]})
+        st.write({k:value(products[pid],k) for k in ["Competition Type","Strategic Priority","Primary Use Case","Target Customers","Target Industries","Commercial Status","Deployment Architecture","Space Industry Applicability","Space Deployment Evidence","Related Observation IDs","Product URL","Notes"]})
         if not threat.empty: table(st,threat[threat["Product ID"]==pid].drop(columns=["Rank group"]),"profile-threat")
-        table(st,advantages(data,allmat.loc[[pid]],cfg,mode),"profile-relative-position")
+        st.write(classifications[pid])
+        table(st,head_to_head(data,allmat,cfg,pid,mode),"profile-relative-position")
         cid=st.selectbox("Inspect criterion evidence",list(criteria),format_func=lambda c:c+" · "+labels[c],key="cmd-cid")
         cur=direct_current(data).get((pid,cid),{})
         st.write("Direct verdict:",cur.get("status","Unassessed"))
@@ -180,7 +219,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         if not av.empty: table(st,av,"advantage-register")
     elif view=="Watchlist & evolution":
         st.subheader("Watchlist")
-        if not threat.empty: table(st,threat.drop(columns=["Rank group"]),"watchlist")
+        if not threat.empty: table(st,family_watchlist(threat).drop(columns=["Rank group"]),"watchlist")
         if not demo_mode and len(snapshots)>1:
             alternatives=[s for s in snapshots if s[0]!=current]
             if alternatives:
@@ -217,7 +256,10 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         if not obs.empty: table(st,obs.sort_values("Date added (ISO)",ascending=False).head(20) if "Date added (ISO)" in obs else obs.head(20),"watch-observations")
     else:
         st.subheader("Actionable direct comparison research")
-        q=research_queue(data,allmat,cfg)
-        st.caption("Heuristic triage: source competition classification, criterion importance, uncertainty, weak and ageing evidence. Export questions to the authorised research workflow; no write to source.")
-        if not q.empty: table(st,q.head(300),"priority-research")
+        snapshot_date=next((s[1] for s in snapshots if s[0]==current),"") if not demo_mode else "Synthetic demo"
+        q=research_queue(data,allmat,cfg,snapshot_date)
+        st.caption("Research priority is separate from threat exposure. Export the complete queue to the authorised research workflow; no write to source. Snapshot date is the selected local capture time.")
+        if not q.empty:
+            st.dataframe(q.head(300),use_container_width=True,hide_index=True)
+            st.download_button("Export complete research queue CSV",q.to_csv(index=False).encode("utf-8"),file_name="priority-research.csv",key="cmd-priority-research")
         else: st.info("No selected research questions.")

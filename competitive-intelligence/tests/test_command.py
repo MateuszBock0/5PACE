@@ -30,7 +30,8 @@ def test_threat_and_advantage_bounds():
     assert profile({},"CR1","As-Is")=="Supported"
     assert profile({},"CR1","Target")=="Target"
     t=threat_table(d,m,{"CR1":1})
-    assert t.iloc[0].Role=="Direct"
+    assert set(t.Role)=={"Direct","Adjacent / substitute"}
+    assert t["Threat upper"].is_monotonic_decreasing
     assert (t["Threat lower"]<=t["Threat upper"]).all()
     assert advantages(d,m,{},"As-Is").iloc[0].Assessment=="Observed parity"
     cfg={"command_profiles":{"CR1":{"status":"Supported","stage":"Verified","reference":"test","demand":"Validated","demand_reference":"interview"}}}
@@ -61,3 +62,53 @@ def test_declared_baseline_without_evidence():
     assert a.Demand=="Unvalidated"
     assert a["AIT-VISTA basis"]=="Team-declared functionality"
     assert profile({"command_profiles":{"CR1":{"status":"Partially supported"}}},"CR1","As-Is")=="Partially supported"
+
+def test_role_family_and_research_contract():
+    from competitive_roles import classify, family_root, family_watchlist
+    d=comparison_fixture()
+    a,b=d["Products"]["rows"]
+    a.update({"Product Category":"Automated Visual Inspection","Primary Use Case":"Visually inspect spacecraft assembly with cameras","Target Customers":"Satellite AIT engineers"})
+    b.update({"Product Family":"DEMO-P1","Product Category":"Digital Work Instructions","Primary Use Case":"Execute spacecraft assembly procedures","Target Customers":"Spacecraft AIT teams"})
+    assert classify(a)["Analytical role"]=="Direct visual AIT candidate"
+    assert classify(b)["Analytical role"]=="Workflow / procurement substitute candidate"
+    assert family_root(registry(d,"Products","Product ID"),"DEMO-P2")=="DEMO-P1"
+    t=threat_table(d,direct_matrix(d),{"CR1":1})
+    f=family_watchlist(t)
+    assert len(f)==1 and f.iloc[0]["Family members"]==2
+    assert f.iloc[0]["Family upper"]==t["Threat upper"].max()
+    assert advantages(d,direct_matrix(d),{},"As-Is").iloc[0]["Eligible competitors"]==1
+    q=research_queue(d,direct_matrix(d),{},"2026-11-26T23:00:00Z")
+    assert list(q.columns)==["Product ID","Criterion ID","Research question","Strategic decision affected","Priority","Existing evidence IDs","Reason for uncertainty","Snapshot date"]
+    assert set(q["Snapshot date"])=={"2026-11-26T23:00:00Z"}
+    assert (q["Criterion ID"]=="").any()
+    assert head_to_head(d,direct_matrix(d),{},"DEMO-P2","As-Is").iloc[0].Comparison=="AIT-VISTA functional superiority"
+    assert head_to_head(d,direct_matrix(d),{},"DEMO-P2","Target").iloc[0].Comparison.startswith("Planned")
+    d[ASSESS]["rows"][1]["Verdict"]="Unknown"
+    assert head_to_head(d,direct_matrix(d),{},"DEMO-P2","As-Is").iloc[0].Comparison=="Insufficient evidence"
+
+def test_uncertainty_does_not_reduce_upper_exposure():
+    d=comparison_fixture()
+    m=direct_matrix(d)
+    initial=threat_table(d,m,{"CR1":1}).set_index("Product ID")
+    m.loc["DEMO-P2","CR1"]="Unassessed"
+    later=threat_table(d,m,{"CR1":1}).set_index("Product ID")
+    assert later.loc["DEMO-P2","Threat upper"]>=initial.loc["DEMO-P2","Threat upper"]
+
+def test_weak_evidence_does_not_confirm_inferiority():
+    d=comparison_fixture()
+    d[ASSESS]["rows"][0]["Evidence level"]="Vendor claim"
+    cfg={"command_profiles":{"CR1":{"status":"Partially supported"}}}
+    m=direct_matrix(d,["DEMO-P1"])
+    assert advantages(d,m,cfg,"As-Is").iloc[0].Assessment.startswith("Potential disadvantage")
+    assert head_to_head(d,m,cfg,"DEMO-P1","As-Is").iloc[0].Comparison.startswith("Provisional")
+
+def test_negative_space_mentions_do_not_promote_direct_role():
+    from competitive_roles import classify
+    row={"Product Category":"Assembly Guidance","Primary Use Case":"Visually inspect industrial assembly","Target Customers":"Manufacturing teams; spacecraft customer unverified","Space Industry Applicability":"Not established"}
+    assert classify(row)["Analytical role"]=="Cross-industry competitor candidate"
+    row["Space Industry Applicability"]="Space offering"
+    assert classify(row)["Analytical role"]=="Direct visual AIT candidate"
+    row["Space Industry Applicability"]="Space AIT R&D heritage"
+    assert classify(row)["Analytical role"]=="Cross-industry competitor candidate"
+    row={"Product Category":"Manufacturing Traceability","Primary Use Case":"Manage hardware manufacturing travellers and work plans","Space Industry Applicability":"Space offering","Target Customers":"Hardware engineering teams"}
+    assert classify(row)["Analytical role"]=="Workflow / procurement substitute candidate"

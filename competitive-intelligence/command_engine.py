@@ -5,6 +5,7 @@ import pandas as pd
 from core import value, split_ids
 from analytics import KNOWN, EVIDENCE_RANK, score_bounds
 from strategic import commercial_mcda
+from competitive_roles import classify, family_root, attention
 from product_intelligence import source_rows, CRITERIA
 
 ASSESS="Comparison Assessment"
@@ -98,6 +99,7 @@ def matrix_audit(data):
     if VIEW not in data: return ["Derived comparison worksheet absent"]
     m=direct_matrix(data); out=[]
     rows=registry(data,VIEW,"Product ID")
+    if len(rows)!=sum(bool(value(r,"Product ID")) for r in source_rows(data,VIEW)): out.append("Derived matrix contains duplicate product IDs")
     if set(rows)!=set(m.index): out.append("Derived matrix product IDs differ from canonical products")
     if not set(m.columns).issubset(data[VIEW]["headers"]): out.append("Derived matrix missing criterion columns")
     for p in m.index:
@@ -143,45 +145,61 @@ def threat_table(data,mat,weights,criterion_weights=None):
         evidence=[current[(pid,c)]["evidence"] for c in cols if (pid,c) in current and r[c] in KNOWN]
         strong=sum(EVIDENCE_RANK.get(e,0)>=3 for e in evidence)
         low=float(total.loc[pid,"Lower"]); high=float(total.loc[pid,"Upper"])
-        # The source role is an analyst classification, not a calculated probability.
-        if role=="Direct": action="Review first — direct classification"
-        elif role=="Adjacent / substitute": action="Assess substitution and customer overlap"
-        elif role=="Potential entrant": action="Monitor entry signals"
-        elif role=="Indirect": action="Monitor selectively"
-        else: action="Classify customer/use-case overlap"
+        classification=classify(p)
+        analytical=classification["Analytical role"]
+        exposure=attention(low,high)
+        if analytical=="Direct visual AIT candidate": action="Review visual AIT substitution and operational performance"
+        elif analytical=="Workflow / procurement substitute candidate": action="Verify shared buyer, procurement and workflow replacement"
+        elif analytical=="Cross-industry competitor candidate": action="Check spacecraft AIT adaptation and customer overlap"
+        elif analytical in {"Enabling technology","Complementary system"}: action="Check integration vs substitution; do not assume direct competition"
+        elif analytical in {"Research / emerging entrant","Internal / custom solution","Historical solution"}: action="Monitor external availability and transition to commercial offer"
+        else: action="Resolve product role and procurement overlap"
         criteria=registry(data,CRITERIA,"Criterion ID")
         supported=[value(criteria[c],"Product criterion") for c in cols if r[c]=="Supported"]
         partial=[value(criteria[c],"Product criterion") for c in cols if r[c]=="Partially supported"]
         unknown=[c for c in cols if r[c] not in KNOWN and r[c]!="Not applicable"]
         reason=("Full recorded criterion support: "+", ".join(supported[:3])) if supported else ("Partial recorded scope: "+", ".join(partial[:3])) if partial else "No positive direct criterion verdict in selected scope"
         rows.append({"Product ID":pid,"Product":value(p,"Product Name"),"Company":value(companies.get(value(p,"Company ID"),{}),"Company Name"),
-            "Role":role,"Source priority":value(p,"Strategic Priority"),"Review action":action,"Why watch":reason,"Unresolved criteria":len(unknown),
+            "Role":role,**classification,"Family ID":family_root(products,pid),"Attention":exposure,"Source priority":value(p,"Strategic Priority"),"Review action":action,"Why watch":reason,"Unresolved criteria":len(unknown),
             "Overlap lower":float(b.loc[pid,"Lower"]),"Overlap upper":float(b.loc[pid,"Upper"]),
             "Market lower":float(commercial.loc[pid,"Lower"]),"Market upper":float(commercial.loc[pid,"Upper"]),
             "Threat lower":low,"Threat upper":high,"Known weight":known,"Technical/independent records":strong,
             "Rank group":ROLE_ORDER.get(role,4),"Commercial status":value(p,"Commercial Status"),
             "Space relevance":value(p,"Space Industry Applicability"),"Customer segment":value(p,"Target Customers")})
-    return pd.DataFrame(rows).sort_values(["Rank group","Threat lower","Threat upper","Product ID"],ascending=[True,False,False,True])
+    return pd.DataFrame(rows).sort_values(["Threat upper","Threat lower","Product ID"],ascending=[False,False,True],na_position="last")
 
 def advantages(data,mat,cfg,mode):
     current=direct_current(data)
     criteria=registry(data,CRITERIA,"Criterion ID")
     result=[]
+    products=registry(data,"Products","Product ID")
     for c in mat.columns:
         our=profile(cfg,c,mode); r=cfg.get("command_profiles",{}).get(c,{})
         column=mat[c]; eligible=column[column!="Not applicable"]
         known=eligible[eligible.isin(KNOWN)]
         positives=known[known.isin(["Supported","Partially supported"])]
-        n=len(eligible); unresolved=n-len(known)
+        # Group explicit platform/module relationships for cohort metrics.
+        families=defaultdict(list)
+        for p,s in eligible.items(): families[family_root(products,p)].append((p,s))
+        family_status={}
+        for f,members in families.items():
+            scores=[KNOWN[s] for p,s in members if s in KNOWN]
+            if 1. in scores: family_status[f]="Supported"
+            elif any(s not in KNOWN for p,s in members): family_status[f]="Unknown"
+            elif scores: family_status[f]="Partially supported" if max(scores)==.5 else "Explicitly unsupported"
+            else: family_status[f]="Unknown"
+        n=len(families); unresolved=sum(s=="Unknown" for s in family_status.values())
         strong=all(EVIDENCE_RANK.get(current.get((p,c),{}).get("evidence",""),0)>=3 for p in eligible.index)
-        # Only fully resolved selected cohort can support a comparative absence claim.
-        complete=n>0 and unresolved==0 and strong
+        # No market-wide absence claim. Every applicable member must be resolved and strong.
+        complete=n>0 and len(known)==len(eligible) and strong
         demand=r.get("demand")=="Validated" and bool(str(r.get("demand_reference","")).strip())
         actual=our in KNOWN
         best=max((KNOWN[v] for v in known),default=None)
         if our=="Not applicable": label="Outside selected scope"
         elif not n: label="No applicable competitor in cohort"
-        elif actual and best is not None and KNOWN[our]<best: label="Observed disadvantage"
+        elif actual and best is not None and KNOWN[our]<best:
+            stronger=[p for p in known.index if KNOWN[known[p]]>KNOWN[our]]
+            label="Observed disadvantage" if any(EVIDENCE_RANK.get(current.get((p,c),{}).get("evidence",""),0)>=3 for p in stronger) else "Potential disadvantage — weak competitor evidence"
         elif our=="Target" and best==1: label="Planned parity / existing offer"
         elif actual and complete and KNOWN[our]==best: label="Observed parity"
         elif actual and best==1 and KNOWN[our]==1: label="Recorded functional parity with at least one competitor"
@@ -193,19 +211,22 @@ def advantages(data,mat,cfg,mode):
         elif our=="Target": label="Planned overlap — differentiation unproven"
         else: label="Insufficient evidence"
         # Best observed competitor is only a lower bound on the best possible.
-        best_upper=1. if unresolved else best
+        best_upper=1. if len(known)<len(eligible) or not strong else best
         delta_low=KNOWN[our]-best_upper if actual and best_upper is not None else None
         delta_high=KNOWN[our]-best if actual and best is not None else None
         if actual and best is None and n: delta_low=KNOWN[our]-1;delta_high=KNOWN[our]
         result.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"AIT-VISTA":our,
-            "Assessment":label,"Known competitors":len(known),"Eligible competitors":n,"Unresolved":unresolved,
-            "Existing full support":int((known=="Supported").sum()),"Existing partial support":int((known=="Partially supported").sum()),
+            "Assessment":label,"Known competitors":n-unresolved,"Eligible competitors":n,"Unresolved":unresolved,
+            "Existing full support":sum(s=="Supported" for s in family_status.values()),"Existing partial support":sum(s=="Partially supported" for s in family_status.values()),
+            "Applicable products":len(eligible),"Determinate products":len(known),"Customer importance (team estimate)":r.get("strategic_value","Unknown"),
+            "Operational performance comparison":"Not established — comparable measures required",
+            "AIT-VISTA maturity":r.get("stage","Implemented (team-declared)"),
             "Best observed":best,"Delta lower":delta_low,"Delta upper":delta_high,"Demand": "Validated (local declaration)" if demand else "Unvalidated",
             "AIT-VISTA basis":"Team-declared functionality" if mode=="As-Is" else "Selected scope",
             "Reference":r.get("reference",""),"Demand reference":r.get("demand_reference","")})
     return pd.DataFrame(result)
 
-def research_queue(data,mat,cfg):
+def research_queue(data,mat,cfg,snapshot_date=""):
     current=direct_current(data); products=registry(data,"Products","Product ID"); criteria=registry(data,CRITERIA,"Criterion ID")
     out=[]
     for p,row in mat.iterrows():
@@ -220,11 +241,27 @@ def research_queue(data,mat,cfg):
             stale=age is not None and age>=int(cfg.get("research_stale_days",90))
             if s in KNOWN and not weak and not stale: continue
             imp=float(cfg.get("command_profiles",{}).get(c,{}).get("importance",3))
-            priority=(5 if role=="Direct" else 3 if role=="Adjacent / substitute" else 1)+imp+(3 if s=="Disputed" else 2 if s in {"Unknown","Unassessed","Announced"} else 1)+(1 if stale else 0)
-            out.append({"Product ID":p,"Product":value(pr,"Product Name"),"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),
-              "Status":s,"Evidence":level,"Age days":age,"Research priority":priority,
-              "Question":f"Verify whether {value(pr,'Product Name')} meets the full criterion: {value(criteria[c],'Product criterion')}. Identify conditions, limits and primary evidence."})
-    return pd.DataFrame(out,columns=["Product ID","Product","Criterion ID","Criterion","Status","Evidence","Age days","Research priority","Question"]).sort_values(["Research priority","Product ID","Criterion ID"],ascending=[False,True,True])
+            role_weight=5 if classify(pr)["Analytical role"] in {"Direct visual AIT candidate","Workflow / procurement substitute candidate"} else 3 if role in {"Direct","Adjacent / substitute"} else 1
+            priority=role_weight+imp+(3 if s=="Disputed" else 2 if s in {"Unknown","Unassessed","Announced"} else 1)+(1 if stale else 0)
+            ids={x for r in e.get("rows",[]) for field in ("Comparison ID","Related Assessment IDs","Related Observation IDs","Related Evidence IDs") for x in split_ids(r.get(field))}
+            # Product-level references are relevant starting points, not direct
+            # criterion verdicts. Include them for empty/unknown comparisons.
+            ids.update(split_ids(pr.get("Related Observation IDs")))
+            ids.update(split_ids(pr.get("Space Deployment Evidence")))
+            reasons=[s] if s not in KNOWN else []
+            if weak: reasons.append("Weak or missing evidence")
+            if stale: reasons.append("Assessment review due")
+            out.append({"Product ID":p,"Criterion ID":c,"Research question":f"Verify whether {value(pr,'Product Name')} meets the full criterion: {value(criteria[c],'Product criterion')}. Identify conditions, limits and primary evidence.",
+              "Strategic decision affected":"Functional differentiation / product positioning" if profile(cfg,c,"As-Is")=="Supported" else "Product scope / development priority",
+              "Priority":priority,"Existing evidence IDs":"; ".join(sorted(ids)),"Reason for uncertainty":"; ".join(reasons),"Snapshot date":snapshot_date})
+        cl=classify(pr)
+        if cl["Missing context"] or cl["Analytical role"]=="Unresolved role" or cl["Analytical role"].endswith("candidate"):
+            refs={x for field in ("Related Observation IDs","Space Deployment Evidence") for x in split_ids(pr.get(field))}
+            out.append({"Product ID":p,"Criterion ID":"","Research question":f"Establish {value(pr,'Product Name')}'s target buyer, procurement overlap, AIT use case, independent availability and deployment architecture. Distinguish platform and modules.",
+                "Strategic decision affected":"Competitive classification / substitution / monitoring priority",
+                "Priority":10 if role=="Direct" else 7,"Existing evidence IDs":"; ".join(sorted(refs)),
+                "Reason for uncertainty":cl["Classification basis"]+" Missing fields: "+(cl["Missing context"] or "none; buying decision remains unestablished"),"Snapshot date":snapshot_date})
+    return pd.DataFrame(out,columns=["Product ID","Criterion ID","Research question","Strategic decision affected","Priority","Existing evidence IDs","Reason for uncertainty","Snapshot date"]).sort_values(["Priority","Product ID","Criterion ID"],ascending=[False,True,True])
 
 def comparison_changes(before,after):
     a=direct_current(before); b=direct_current(after)
@@ -252,3 +289,26 @@ def overlap_history(snapshots,product_ids,criteria,weights):
         for r in score_bounds(m,weights).to_dict("records"):
             rows.append({"Snapshot":stamp,**r})
     return pd.DataFrame(rows,columns=["Snapshot","Product ID","Lower","Upper","Known weight"])
+
+def head_to_head(data,mat,cfg,pid,mode):
+    current=direct_current(data)
+    criteria=registry(data,CRITERIA,"Criterion ID")
+    rows=[]
+    for c in mat.columns:
+        ours=profile(cfg,c,mode)
+        theirs=mat.loc[pid,c]
+        e=current.get((pid,c),{})
+        level=e.get("evidence","")
+        strong=EVIDENCE_RANK.get(level,0)>=3
+        if ours=="Not applicable": result="Outside scope"
+        elif ours=="Unknown" or theirs not in KNOWN: result="Insufficient evidence" if theirs!="Not applicable" else "Not applicable"
+        elif ours=="Target": result="Planned functionality / existing competitor offer" if theirs=="Supported" else "Planned differentiation hypothesis"
+        elif not strong: result="Provisional comparison — weak competitor evidence"
+        elif KNOWN[ours]>KNOWN[theirs]: result="AIT-VISTA functional superiority"
+        elif KNOWN[ours]<KNOWN[theirs]: result="Competitor functional superiority"
+        else: result="Functional parity"
+        rows.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"AIT-VISTA":ours,"AIT-VISTA As-Is":profile(cfg,c,"As-Is"),"Competitor":theirs,"Comparison":result,"Evidence level":level,
+            "Comparison IDs":"; ".join(value(r,"Comparison ID") for r in e.get("rows",[])),
+            "Limitations":"; ".join(value(r,"Limitations") for r in e.get("rows",[])),
+            "Operational performance":"Not established by categorical verdict"})
+    return pd.DataFrame(rows)

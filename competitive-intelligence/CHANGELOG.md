@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0-rc1 — Company Watchlist
+
+- Independent company-level watchlist with configurable 20% overlap and three-gap default thresholds, source-backed space signals, and separate weak-claim / unresolved counts.
+- Evidence drill-down, profile navigation, local snapshot comparisons and selected CSV, Excel and PDF exports.
+- Strategic core 40/60 and read-only source governance unchanged.
+
 ## 1.4.9-rc1 — Company Portfolio Coverage
 
 - Second Command Centre chart: stacked best-product and incremental portfolio coverage for all registered companies.

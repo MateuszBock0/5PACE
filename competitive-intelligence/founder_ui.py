@@ -6,6 +6,7 @@ from chart_theme import render_chart, tokens, role_colors, action_colors, refere
 from core import value,connect,read_snapshot,digest
 from space_research import priority_queue
 from portfolio_ui import portfolio_view
+from watchlist_ui import watchlist_view
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
@@ -15,7 +16,7 @@ from founder import strategic_map_cohort,map_exclusions,DEFAULT_MAP_SCOPE,MAP_SC
 from threat_watch import exposure,spread_points,short_criterion,selected_criteria,threat_cohort,exposure_records,headline_records,material_pairs,priority_records
 from decision import CUSTOMER_LANES,FUNCTION_LANES,company_brief,differentiation_questions,signals,importance_lane
 
-PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
+PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Company Watchlist","Intelligence Monitor","Advanced Analytics"]
 
 def navigate(st,pid=None,cid=None,page="Competitor Explorer",criterion=None,register=None,reference=None):
     st.session_state["founder_workspace"]=page
@@ -607,4 +608,5 @@ def founder_page(st,page,data,cfg,snapshots,current,demo):
     elif page=="Competitor Explorer":explorer(st,data,cfg,rows)
     elif page=="Market Positioning":positioning(st,data,cfg,rows)
     elif page=="Competitive Advantage":advantage(st,data,cfg,rows)
+    elif page=="Company Watchlist":watchlist_view(st,data,cfg,snapshots,current,demo,navigate,table)
     else:monitor(st,data,cfg,rows,snapshots,current,demo)

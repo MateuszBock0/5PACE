@@ -52,9 +52,16 @@ def test_founder_navigation(monkeypatch,tmp_path):
     next(b for b in app.button if b.label=="Open profile").click().run()
     assert app.sidebar.radio[0].value=="Competitor Explorer"
     assert not app.exception
-    for page in ["Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Command Centre"]:
+    for page in ["Market Positioning","Competitive Advantage","Company Watchlist","Intelligence Monitor","Competitor Explorer","Command Centre"]:
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception,f"{page}: {app.exception}"
+        if page=="Company Watchlist":
+            assert app.slider(key="watch-threshold").value==20
+            assert app.slider(key="watch-min-gaps").value==3
+            app.slider(key="watch-threshold").set_value(40).run()
+            app.button(key="watch-reset").click().run()
+            assert app.slider(key="watch-threshold").value==20
+            assert not app.exception
         if page=="Market Positioning":
             assert app.selectbox(key="market-map-scope").value==DEFAULT_MAP_SCOPE
             assert not app.session_state["founder-map-products"]

@@ -76,8 +76,13 @@ def run():
                 for section in ["Overview","Products","Compare","Deployments","Pricing","Evidence","Timeline"]:
                     app.radio(key="profile-section").set_value(section).run();check(name+" "+section)
                 report["Profiles"].append({"Company":name,"Product":core.value(products[pid],"Product Name"),"Sections":"7/7","Customer position":r["Customer position"],"Procurement":r["Procurement"],"Direct active pairs":sum(p==pid for p,c in direct_current(data))})
-            for view in ["Command Centre","Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Advanced Analytics"]:
+            for view in ["Command Centre","Market Positioning","Competitive Advantage","Company Watchlist","Intelligence Monitor","Competitor Explorer","Advanced Analytics"]:
                 app.sidebar.radio[0].set_value(view).run();check(view);report["Workspaces"].append(view)
+                if view=="Company Watchlist":
+                    from company_watchlist import watchlist
+                    w,_=watchlist(data)
+                    assert set(app.session_state["watchlist-company-ids"])==set(w["Company ID"])
+                    report["Watchlist companies"]=len(w)
                 if view=="Market Positioning":
                     assert set(app.session_state["founder-map-products"])==expected
                     assert set(app.session_state["workflow-products"])==expected

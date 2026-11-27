@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0-rc1 — Founder-first UX
+
+- Five strategic workspaces and a separate Advanced Analytics navigation.
+- Company-first searchable profiles, role-based watch cards, evidence drill-downs and product navigation.
+- Qualitative landscape, strategic heatmap, differentiation and workflow coverage, recorded developments and research export.
+- Preserve all previous analytical workspaces and Excel archiving.
+
 ## 1.3.1-rc1 — Excel Archive & Data Export
 
 - Automatic values-only XLSX archiving following validated SQLite sync, monthly history and latest copy.

@@ -164,3 +164,6 @@ The landing map includes a role-balanced shortlist of up to ten commercial famil
 
 ## v1.4.4-rc1 — consolidated QA handover
 Threat Watch and a response-priority view reuse active comparison records; full/partial support, unresolved evidence and procurement remain distinct. The reference marker is drawn below rivals; founder maps separate exact co-location with display-only offsets. Compact workflow selection, short status labels and wrapped evidence cards. Synthetic PDF provenance is sanitised at the renderer boundary. Native PDF reports include threat decisions and map exclusions. Local acceptance now includes AI4AIT and seven actual-snapshot PDF files (signature checks, visual review separate). No source changes.
+
+## v1.4.5 — axis-union map and decision QA
+Default map includes every product with Space AIT target/case OR material/broad recorded overlap. No top-N cap, role or family filtering. Other scopes are retained. Threat Watch shows provisional evidence-ranked headlines plus separate procurement research, all active alternate records, and consistent selected criterion scope. PDF export offers explicit Threat Watch selection and criterion scope, and labels static reports separately from snapshot-change analysis. Native Windows browser acceptance remains separate from CI.

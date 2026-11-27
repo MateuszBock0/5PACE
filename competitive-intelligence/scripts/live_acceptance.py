@@ -38,9 +38,13 @@ def run():
             check("Landing")
             assert any(mode in c.value for c in app.caption),"Incorrect dataset indicator"
             rows=summaries(data);products=registry(data,"Products","Product ID")
+            from founder import strategic_map_cohort,DEFAULT_MAP_SCOPE
+            expected={r["Product ID"] for _,r in rows.iterrows() if r["Customer position"] in {"Space AIT target segment","Space AIT implementation case"} or r["Functional overlap"] in {"Material recorded overlap","Broad recorded overlap"}}
+            assert set(strategic_map_cohort(rows)["Product ID"])==expected
+            assert set(strategic_map_cohort(rows,"All products")["Product ID"])==set(products)
             companies=registry(data,"Companies","Company ID")
             report={"Snapshot hash":h,"Capture UTC":snap[1],"Source":snap[2],"Mode":mode,
-                    "Validation errors":errors,"Validation warnings":warnings,"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
+                    "Validation errors":errors,"Validation warnings":warnings,"Default map eligible IDs":sorted(expected),"All product IDs":sorted(products),"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
             for name in ["Connektica","Rapta","Dheera","iLEAN","AI4AIT"]:
                 ids=[c for c in search_companies(data,name) if core.value(companies[c],"Company Name").casefold()==name.casefold() or (name=="AI4AIT" and core.value(companies[c],"Company Name").casefold().startswith("ai4ait"))]
                 if len(ids)!=1:raise RuntimeError("Profile missing or ambiguous: "+name)

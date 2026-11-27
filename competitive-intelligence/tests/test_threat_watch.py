@@ -31,3 +31,45 @@ def test_record_specific_evidence_level():
     e=exposure(d,{},[r["Product ID"]],[r["Criterion ID"]]).iloc[0]
     assert e["Comparison ID"]=="CMP-STRONG"
     assert e.Evidence=="Official technical documentation"
+
+def test_axis_union_all_16_combinations_and_no_family_or_role_filter():
+    from founder import strategic_map_cohort,DEFAULT_MAP_SCOPE,map_exclusions
+    from decision import CUSTOMER_LANES,FUNCTION_LANES
+    d=pd.DataFrame([{"Product ID":f"{i}-{j}","Family ID":"same","Role":"Unresolved role","Order":4,"Customer position":y,"Functional overlap":x} for i,y in enumerate(CUSTOMER_LANES) for j,x in enumerate(FUNCTION_LANES)])
+    included=strategic_map_cohort(d,limit=0)
+    assert len(included)==12
+    assert set(included["Product ID"])=={f"{i}-{j}" for i in range(4) for j in range(4) if i>=2 or j>=2}
+    assert len(map_exclusions(d,included,DEFAULT_MAP_SCOPE))==4
+    assert len(strategic_map_cohort(d,"All products"))==16
+
+def test_record_priorities_preserve_alternate_evidence_and_disputes():
+    import copy
+    from threat_watch import exposure_records,headline_records,material_pairs
+    d=comparison_fixture()
+    r=copy.deepcopy(d["Comparison Assessment"]["rows"][0]);r["Comparison ID"]="ALTERNATE";r["Verdict"]="Partially supported"
+    d["Comparison Assessment"]["rows"].append(r)
+    e=exposure_records(d,{},["DEMO-P1","DEMO-P2"],["CR1"])
+    assert len(e[e["Product ID"]=="DEMO-P1"])==2
+    assert set(e[e["Product ID"]=="DEMO-P1"].Verdict)=={"Disputed"}
+    assert not (e.Action=="React").any()
+    assert "ALTERNATE" in set(e["Comparison ID"])
+    assert material_pairs(comparison_fixture(),d)=={("DEMO-P1","CR1")}
+
+def test_headlines_include_partial_and_provenance_gates_react():
+    from threat_watch import exposure_records,headline_records
+    d=comparison_fixture()
+    d["Comparison Assessment"]["rows"][1]["Verdict"]="Partially supported"
+    e=exposure_records(d,{},["DEMO-P1","DEMO-P2"],["CR1"])
+    assert set(headline_records(e).Verdict)=={"Supported","Partially supported"}
+    assert not (e.Action=="React").any()
+
+def test_strong_partial_react_not_hidden_by_weak_full():
+    from threat_watch import exposure,exposure_records
+    d=comparison_fixture()
+    d["Comparison Assessment"]["rows"][0]["Evidence level"]="Vendor claim"
+    d["Comparison Assessment"]["rows"][1]["Verdict"]="Partially supported"
+    d["Comparison Assessment"]["rows"][1]["Evidence level"]="Official technical documentation"
+    cfg={"command_profiles":{"CR1":{"customer_importance":"High","customer_importance_reference":"customer-interview-reference"}}}
+    records=exposure_records(d,cfg,["DEMO-P1","DEMO-P2"],["CR1"])
+    assert records[records["Product ID"]=="DEMO-P2"].iloc[0].Action=="React"
+    assert exposure(d,cfg,["DEMO-P1","DEMO-P2"],["CR1"]).iloc[0]["Product ID"]=="DEMO-P2"

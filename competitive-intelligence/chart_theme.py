@@ -17,14 +17,8 @@ STATUS_DARK=["#742D40","#2A3445","#425873","#65447D","#414A54","#264D85","#77522
 STATUS_LIGHT=["#F3D5D5","#E9EEF2","#C8D6E3","#E5D6EF","#D9DCE1","#DBE5F9","#F8E8CD","#D9EEEA"]
 
 def active_theme():
-    # Recent Streamlit exposes the actual client theme. Older supported
-    # versions fall back to the configured default, without a new dependency.
-    try:
-        theme=getattr(st.context,"theme",None)
-        mode=getattr(theme,"type",None)
-        if mode in ("dark","light"):return mode
-    except Exception:
-        pass
+    # Honour the application's configured theme, not the browser's initial
+    # OS preference (which may still be light during first render).
     return "light" if st.get_option("theme.base")=="light" else "dark"
 
 def tokens(mode=None):

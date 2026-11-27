@@ -89,7 +89,7 @@ def capture(out,live=False):
                 else:raise RuntimeError("Streamlit failed to start")
                 with sync_playwright() as pw:
                     browser=pw.chromium.launch(args=["--no-sandbox"])
-                    page=browser.new_page(viewport={"width":1600,"height":1080},device_scale_factor=1)
+                    page=browser.new_page(viewport={"width":1600,"height":1080},device_scale_factor=1,color_scheme="dark")
                     page.goto("http://127.0.0.1:8765",wait_until="domcontentloaded")
                     def ready(heading):
                         page.get_by_role("heading",name=heading,exact=True).wait_for(timeout=45000)

@@ -138,6 +138,16 @@ def capture(out,live=False):
                         page.set_viewport_size({"width":width,"height":height});page.wait_for_timeout(500)
                         top();shot("Landing_"+str(width)+"x"+str(height))
                     page.set_viewport_size({"width":1600,"height":1080});page.wait_for_timeout(500)
+                    section("Company Portfolio Coverage");shot("10_Company_Portfolio")
+                    if not live:
+                        portfolio=page.locator(".js-plotly-plot").nth(1)
+                        portfolio.wait_for(timeout=20000)
+                        info=portfolio.evaluate("""gd=>({bg:gd._fullLayout.plot_bgcolor,bars:gd.data.filter(t=>t.type==="bar").length,ids:gd.data[0].customdata.map(d=>d[0])})""")
+                        assert info["bg"].lower()=="#141f30" and info["bars"]==2 and len(set(info["ids"]))==4,info
+                        portfolio.scroll_into_view_if_needed()
+                        portfolio.locator(".barlayer .trace .point path").first.click(force=True)
+                        page.wait_for_timeout(800)
+                        assert page.get_by_text("Eight criterion attribution",exact=True).count()==1
                     section("Threat Watch");shot("09_Threat_Watch")
                     top()
                     def map_point(pid,criterion=None,plot_index=0):
@@ -210,7 +220,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.8 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.9 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

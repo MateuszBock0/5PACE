@@ -20,6 +20,7 @@ from product_intelligence import CRITERIA
 from founder import DEFAULT_MAP_SCOPE,summaries,strategic_map_cohort,brief_criteria,profile_records,advantage_summary,profile_findings,WORKFLOW_EXAMPLES
 from decision import signals,CUSTOMER_LANES,FUNCTION_LANES,importance_lane
 from space_research import priority_queue
+from company_portfolio import portfolio_data,filter_companies,CUSTOM,NOTE
 from threat_watch import exposure,report_provenance,selected_criteria,spread_points,exposure_records,priority_records
 
 REPORTS=["Strategic overview","Competitor profile","Market positioning & workflow","Competitive advantage","Intelligence monitor","QA & data integrity","Combined strategic report"]
@@ -48,7 +49,7 @@ def cohort_signals(data,ids,company_ids):
     sig=signals(data)
     return sig[sig["Product ID"].isin(ids)|((sig["Product ID"]=="")&sig["Company ID"].isin(company_ids))]
 
-def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None,map_product_ids=None,queue_only=False):
+def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None,map_product_ids=None,queue_only=False,portfolio_company_ids=None):
     if kind not in REPORTS:raise ValueError("Unknown report type")
     captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
     fonts()
@@ -99,6 +100,44 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
             for j in status_cols:
                 if text(r[j]) in STATUS_COLORS:ts.append(("BACKGROUND",(j,i),(j,i),colors.HexColor(STATUS_COLORS[text(r[j])])))
         t.setStyle(TableStyle(ts));story.extend([t,Spacer(1,8)])
+    def portfolio_section():
+        heading("Company Portfolio Coverage")
+        frame,detail=portfolio_data(data,rows)
+        if portfolio_company_ids is not None:frame=filter_companies(frame,CUSTOM,portfolio_company_ids)
+        add("Company scope: "+("All companies with registered products" if portfolio_company_ids is None else "Explicit company selection")+" ("+str(len(frame))+" companies). All products of each selected company are evaluated. "+NOTE)
+        add("Dark teal = best single product; light teal = additional union coverage. * = Portfolio-only exposure under the existing 40/60 rule; product qualification is unchanged. Recorded and determinate coverage are evidence completeness, not performance. Historical/research/announced scope is included and identifiable; commercial-only sensitivity is separate.")
+        if frame.empty:add("No companies in selected scope.");return
+        for start in range(0,len(frame),16):
+            g=frame.iloc[start:start+16]
+            height=27*len(g)+45;dr=Drawing(width,height);left=width*.39;span=width-left-44
+            for tick in range(0,101,25):
+                x=left+tick*span/100
+                dr.add(Line(x,18,x,height-8,strokeColor=colors.HexColor("#DCE5EB"),strokeWidth=.5))
+                dr.add(String(x,5,str(tick)+"%",fontName=FONT,fontSize=7,textAnchor="middle",fillColor=NAVY))
+            for i,(_,r) in enumerate(g.iterrows()):
+                y=height-25-i*27
+                label=r.Company+(" *" if r["Portfolio flag"]=="Portfolio-only exposure" else "")
+                while pdfmetrics.stringWidth(label,FONT,8)>left-8 and len(label)>4:label=label[:-4]+"…"
+                dr.add(String(0,y+3,label,fontName=FONT,fontSize=8,fillColor=NAVY))
+                a=r["Best single product coverage"]*span;b=r["Additional portfolio coverage"]*span
+                if a:dr.add(Rect(left,y,a,11,fillColor=TEAL,strokeColor=None))
+                if b:dr.add(Rect(left+a,y,b,11,fillColor=colors.HexColor("#72D8C8"),strokeColor=None))
+                if not a and not b:dr.add(Circle(left,y+5,2.5,fillColor=None,strokeColor=NAVY))
+                dr.add(String(left+a+b+5,y+2,f'{r["Portfolio coverage"]:.2%}',fontName=BOLD,fontSize=8,fillColor=NAVY))
+            story.append(dr)
+            table(["Company / best product(s)","Union / best / additional","Coverage / status"],[(r.Company+"\n"+r["Company ID"]+"\n"+r["Best product ties"],f'{r["Portfolio coverage"]:.2%} / {r["Best single product coverage"]:.2%} / {r["Additional portfolio coverage"]*100:.2f} pp\nCommercial-only: {r["Commercial-only coverage"]:.2%}',f'Recorded / determinate: {r["Recorded coverage"]:.2%} / {r["Determinate coverage"]:.2%}\nPair coverage: {r["Pair recorded coverage"]:.2%} / {r["Pair determinate coverage"]:.2%}\n'+r["Portfolio flag"]+"\n"+r["Integration status"]) for _,r in g.iterrows()],[1.5,1,1.7])
+        heading("Company portfolio evidence and attribution")
+        for _,r in frame.iterrows():
+            cid=r["Company ID"];d0=detail[cid]
+            add(r.Company+" | "+cid,"sub")
+            add(r["Portfolio flag"]+" | "+r["Integration status"]+" | Space threshold basis: "+r["Space threshold basis"],"small")
+            table(["Product / ID","Commercial status","Overlap / recorded / determinate"],[(p.Product+"\n"+p["Product ID"],p["Commercial status"],f'{p["Recorded overlap"]:.2%} / {p["Evidence coverage"]:.2%} / {p["Determinate coverage"]:.2%}') for _,p in d0["products"].iterrows()],[2,1,1.4])
+            table(["Criterion / union verdict","Contributing products","All recorded product states"],[(q["Criterion ID"]+"\n"+q["Portfolio verdict"],q["Contributing products"],q["Product states"]) for _,q in d0["criteria"].iterrows()],[1,1.4,2])
+            active=d0["records"][d0["records"]["Comparison ID"]!=""]
+            if not active.empty:
+                table(["Criterion / product / pair verdict","Record ID / evidence / source"],[(e["Criterion ID"]+"\n"+e.Product+"\n"+e["Pair verdict"]+" / "+e["Record verdict"],e["Comparison ID"]+" | "+e["Evidence level"]+" | "+e["Assessment date"]+"\n"+e["Source URLs"]+"\n"+e.Limitations) for _,e in active.iterrows()],[1.3,2.7])
+            for e in d0["integration"]:
+                add(e["Status"]+" — "+" / ".join(e["Product IDs"])+" | "+e["Register"]+" | "+e["Reference"]+"\n"+e["Statement"]+"\n"+e["Source"]+"\n"+e["Limitations"],"small")
     def overview():
         heading("Strategic watchlist")
         add("Recorded roles are provisional; actual procurement overlap is unresolved. Default strategic core: ≥60% recorded overlap, or ≥40% with Space AIT target/case evidence. Space Watch / research is separate. No rank or family exclusions.")
@@ -224,6 +263,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     if not ids:add("No qualifying benchmark products in this scope. Use Space Watch / research or All products; no fallback was applied.")
     def overview_with_threat():
         overview()
+        portfolio_section()
         threat()
     funcs={"Strategic overview":overview_with_threat,"Competitor profile":profile_report,"Market positioning & workflow":market,"Competitive advantage":advantage,"Intelligence monitor":monitor,"QA & data integrity":qa}
     if queue_only:queue_section(True)

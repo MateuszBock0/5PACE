@@ -201,7 +201,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         if submit:
             if demand=="Validated" and not dref.strip(): st.error("Validated customer demand requires a reference; this is separate from functionality.")
             else:
-                allp=dict(cfg.get("command_profiles",{}));allp[cid]={"stage":stage,"status":status,"reference":ref.strip(),"mvp":mvp,"target":target,"demand":demand,"demand_reference":dref.strip(),"importance":importance,"effort":effort,"strategic_value":strategic,"route":route,"tradeoff":trade}
+                allp=dict(cfg.get("command_profiles",{}));allp[cid]={**r,"stage":stage,"status":status,"reference":ref.strip(),"mvp":mvp,"target":target,"demand":demand,"demand_reference":dref.strip(),"importance":importance,"effort":effort,"strategic_value":strategic,"route":route,"tradeoff":trade}
                 save_settings({"command_profiles":allp});st.rerun()
         rows=[]
         for c in criteria:

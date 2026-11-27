@@ -100,3 +100,11 @@ def test_workflow_minimum_is_not_average():
     r=w[w["Product ID"]=="p"].iloc[0]
     assert r.Lower==.5 and r["All mapped criteria lower"]==0
     assert r["Delta vs AIT-VISTA lower"]==-.5
+
+def test_cross_cutting_scope_remains_visible():
+    l=pd.DataFrame([[1,1],[.5,0]],index=[VISTA,"p"],columns=["a","b"])
+    h=l.copy()
+    t=pd.DataFrame({"Criterion ID":["a","b"],"Workflow stages":["Execute & capture",""]})
+    d=workflow_context(l,h,t)
+    assert d.loc[d["Product ID"]=="p","Upper"].iloc[0]==0
+    assert set(d["Criterion IDs"])=={"b"}

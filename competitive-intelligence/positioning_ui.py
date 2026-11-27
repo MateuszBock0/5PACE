@@ -7,7 +7,7 @@ from command_engine import direct_current, registry, ASSESS
 from advanced_ui import save_settings
 from product_intelligence import CRITERIA
 from positioning import (VISTA,ALL,DIMENSIONS,COMMERCIAL,WORKFLOWS,EVIDENCE_MODES,taxonomy,axis_groups,
-    interval_arrays,positioning_table,proximity,company_positions,advantage_portfolio,workflow_groups,workflow_benchmark,sensitivity_analysis)
+    interval_arrays,positioning_table,proximity,company_positions,advantage_portfolio,workflow_groups,workflow_context,workflow_benchmark,sensitivity_analysis)
 
 def table(st,d,key):
     st.dataframe(d,use_container_width=True,hide_index=True)
@@ -41,7 +41,8 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         a,b=st.columns(2)
         x=a.selectbox("X axis",axes,index=0,key="pos-x")
         y=b.selectbox("Y axis",axes,index=axes.index("Visual verification") if "Visual verification" in axes else len(groups),key="pos-y")
-        d=pos.copy()
+        chosen_products=st.multiselect("Limit map to selected products (empty = all)",list(mat.index),format_func=names.get,key="pos-map-products")
+        d=pos[pos["Product ID"].isin([VISTA]+chosen_products)].copy() if chosen_products else pos.copy()
         d["X width"]=(d[x+" upper"]-d[x+" lower"]).clip(lower=0)
         d["Y width"]=(d[y+" upper"]-d[y+" lower"]).clip(lower=0)
         d["Zero"]=0.
@@ -57,7 +58,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         st.caption("A star at 100% functional scope reflects the chosen internal criteria, not universal market leadership. Axes measure scope and ordinal commercial evidence, not measured performance.")
         points=event.selection.points if event is not None and hasattr(event,"selection") else []
         clicked=points[0].get("customdata",[]) if points else []
-        options=list(names)
+        options=d["Product ID"].tolist()
         chosen=clicked[0] if clicked and clicked[0] in options else VISTA
         p=st.selectbox("Inspect product",options,index=options.index(chosen),format_func=names.get,key="pos-inspect-"+chosen)
         detail=pd.DataFrame({"Criterion ID":list(mat.columns),"Criterion":tax.set_index("Criterion ID").loc[list(mat.columns),"Criterion"].tolist(),"Verdict":state.loc[p].tolist(),"Evidence basis":basis.loc[p].tolist(),"Lower":lo.loc[p].tolist(),"Upper":hi.loc[p].tolist()})
@@ -65,18 +66,21 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         if p!=VISTA:
             with st.expander("Underlying comparison records and limitations"):
                 table(st,pd.DataFrame([r for r in data[ASSESS]["rows"] if value(r,"Product ID")==p]),"map-ledger")
-        table(st,d[["Product ID","Product","Company","Role","X lower","X upper","Y lower","Y upper"]],"positions")
+        d["X axis"]=x;d["Y axis"]=y;d["Evidence scenario"]=evidence;d["Partial support"]=partial;d["Baseline"]=mode
+        table(st,d[["Product ID","Product","Company","Role","X axis","X lower","X upper","Y axis","Y lower","Y upper","Evidence scenario","Partial support","Baseline"]],"positions")
     elif view=="Capability profile":
         selected=st.multiselect("Competitors to benchmark",list(mat.index),default=list(mat.index)[:3],format_func=names.get,key="pos-benchmark")
         dims=[d for d in groups if d!=ALL] or [ALL]
         f=go.Figure()
         rows=[]
-        for p in [VISTA]+selected:
+        palette=px.colors.qualitative.Plotly
+        for i,p in enumerate([VISTA]+selected):
             r=pos[pos["Product ID"]==p].iloc[0]
+            color="#22b987" if p==VISTA else palette[(i-1)%len(palette)]
             low=[r[d+" lower"] for d in dims];high=[r[d+" upper"] for d in dims]
             # Draw separate closed bounds, never a made-up midpoint.
-            f.add_trace(go.Scatterpolar(r=low+[low[0]],theta=dims+[dims[0]],mode="lines+markers",name=names[p]+" lower"))
-            f.add_trace(go.Scatterpolar(r=high+[high[0]],theta=dims+[dims[0]],mode="lines",line={"dash":"dot"},name=names[p]+" upper"))
+            f.add_trace(go.Scatterpolar(r=low+[low[0]],theta=dims+[dims[0]],mode="lines+markers",line={"color":color},legendgroup=p,name=names[p]+" lower"))
+            f.add_trace(go.Scatterpolar(r=high+[high[0]],theta=dims+[dims[0]],mode="lines",line={"dash":"dot","color":color},legendgroup=p,name=names[p]+" upper"))
             rows.extend({"Product ID":p,"Product":names[p],"Dimension":d,"Lower":l,"Upper":h} for d,l,h in zip(dims,low,high))
         f.update_layout(polar={"radialaxis":{"range":[0,1],"tickformat":".0%"}},height=520)
         st.plotly_chart(f,use_container_width=True)
@@ -156,6 +160,12 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         st.plotly_chart(fig,use_container_width=True)
         table(st,stages,"workflow-stages")
         table(st,bottleneck,"workflow-bottlenecks")
+        context=workflow_context(lo.loc[[VISTA]+chosen],hi.loc[[VISTA]+chosen],tax,weights)
+        if not context.empty:
+            context["Product"]=context["Product ID"].map(names)
+            st.subheader("Cross-cutting / unassigned workflow criteria")
+            table(st,context,"workflow-context")
+            st.caption("These criteria remain in the overall benchmark but are not forced into a process stage. Review the mapping before interpreting the stage bottleneck.")
         st.caption("Stages may share criteria. The weakest-stage interval identifies a potential coverage bottleneck. All mapped criteria bounds use the minimum criterion score (a conjunctive coverage proxy), not an average or proof of workflow integration. No full workflow qualification is claimed.")
         with st.expander("Workflow integration evidence to review"):
             for p in chosen:

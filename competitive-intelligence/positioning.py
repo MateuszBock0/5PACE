@@ -203,6 +203,14 @@ def advantage_portfolio(data,lo,hi,state,cfg,mode):
                      "Decision":"Protect / validate value" if finding=="Substantiated functional advantage" else "Review gap" if finding=="Substantiated functional disadvantage" else "Investigate / maintain parity"})
     return pd.DataFrame(rows)
 
+def workflow_context(lo,hi,tax,weights=None):
+    """Non-stage criteria remain visible as cross-cutting or unassigned scope."""
+    ids=tax.loc[tax["Workflow stages"]=="","Criterion ID"].tolist()
+    if not ids: return pd.DataFrame(columns=["Product ID","Lower","Upper","Determinate weight","Criterion IDs"])
+    d=bounds(lo,hi,ids,weights).rename_axis("Product ID").reset_index()
+    d["Criterion IDs"]="; ".join(ids)
+    return d
+
 def workflow_benchmark(lo,hi,tax,weights=None):
     groups=workflow_groups(tax)
     rows=[]

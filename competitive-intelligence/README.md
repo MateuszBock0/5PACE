@@ -1,6 +1,6 @@
 # Competitive Intelligence Engine
 
-Version 1.0.0-rc1 — integrated operational release candidate.
+Version 1.3.0-rc1 — market positioning release candidate.
 
 ## First-time installation and authentication
 
@@ -136,3 +136,5 @@ Strategic dimensions and workflow stages are provisional generic label rules wit
 Company portfolio bounds are maxima of individual products, with both representative products named, not a synthetic product combining features. Advantage rarity is bounded over explicit product families; customer importance is a separate optional team estimate. Functional advantage is conditional on the selected cohort and evidence scenario. Workflow stage coverage and the minimum stage interval identify potential bottlenecks, not integrated workflow qualification. Evidence sensitivity varies thresholds, partial convention and seeded criterion weights ±50%, reporting possible rank bounds across sampled scenarios, not probabilities. All outputs are local and exportable. No external research, workbook mutation or mandatory AIT-VISTA implementation evidence.
 
 Even under the permissive recorded-verdict scenario, an advantage is labelled substantiated only when all applicable competitor comparisons have technical-documentation-or-stronger evidence. A company chart includes the AIT-VISTA reference; proximity supports workflow stages and a separate commercial-readiness view for provisional substitution candidates. Workflow output includes both averaged stage coverage and minimum-criterion conjunctive coverage as a conservative proxy, not integration evidence.
+
+The radar uses matching colours for each product's lower/upper outlines. The map supports product filtering and exports the selected axes, evidence scenario and baseline. Non-stage criteria are shown separately as cross-cutting/unassigned workflow scope and still included in overall scoring. Editing a legacy criterion profile preserves optional positioning fields.

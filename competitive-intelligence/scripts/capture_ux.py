@@ -63,10 +63,11 @@ def capture(out,live=False):
         shutil.copytree(ROOT,work,ignore=shutil.ignore_patterns("data","credentials","config.local.json","reports",".venv","__pycache__",".pytest_cache","screenshots"))
         if live:
             import sqlite3,json
+            from contextlib import closing
             from core import DB,config,read_snapshot,state,history,validate
             if not DB.is_file():raise RuntimeError("No local SQLite snapshot; synchronise first.")
             (work/"data").mkdir(exist_ok=True)
-            with sqlite3.connect(DB.as_uri()+"?mode=ro",uri=True) as a,sqlite3.connect(work/"data"/"intelligence.db") as b:a.backup(b)
+            with closing(sqlite3.connect(DB.as_uri()+"?mode=ro",uri=True)) as a,closing(sqlite3.connect(work/"data"/"intelligence.db")) as b:a.backup(b)
             with connect(work/"data"/"intelligence.db") as conn:
                 data=read_snapshot(conn);h=state(conn,"current_hash");snap=next((s for s in history(conn) if s[0]==h),None)
                 if not data or not snap or str(snap[2]).lower().startswith("synthetic"):raise RuntimeError("Actual local snapshot required")

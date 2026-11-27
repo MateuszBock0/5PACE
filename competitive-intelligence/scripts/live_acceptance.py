@@ -2,6 +2,7 @@
 Only a temporary SQLite backup is used. Report is private under reports/.
 """
 import json,sys,sqlite3,tempfile,os
+from contextlib import closing
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -18,7 +19,7 @@ def run():
     out.parent.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cie-acceptance-") as temp:
         path=Path(temp)/"intelligence.db"
-        with sqlite3.connect(core.DB.as_uri()+"?mode=ro",uri=True) as source,sqlite3.connect(path) as target:source.backup(target)
+        with closing(sqlite3.connect(core.DB.as_uri()+"?mode=ro",uri=True)) as source,closing(sqlite3.connect(path)) as target:source.backup(target)
         original=core.connect
         with original(path) as conn:
             data=core.read_snapshot(conn)

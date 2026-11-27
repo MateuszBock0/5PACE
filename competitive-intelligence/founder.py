@@ -2,6 +2,7 @@
 import re
 import pandas as pd
 from core import value, split_ids
+from decision import customer_position,decision_for
 from analytics import EVIDENCE_RANK
 from command_engine import registry,direct_current,direct_matrix,profile,comparison_changes,ASSESS
 from competitive_roles import classify,family_root
@@ -50,13 +51,14 @@ def summaries(data):
         elif role=="Cross-industry competitor candidate": tier="Adjacent market entrant";order=2
         elif role=="Unresolved role" and cl["Source role"] in {"Direct","Adjacent / substitute"}: tier="Classification requires review";order=3
         else: tier="Monitor selectively";order=4
+        position=customer_position(p,deps)
         why=[]
         if full or partial:
             why.append("Recorded overlap: "+ "; ".join(value(criteria[c],"Product criterion") + (" (partial)" if c in partial else "") for c in (full+partial)[:3]))
         if documented: why.append("Implementation records: "+", ".join(dict.fromkeys(value(r,"Customer Organisation") for r in documented if value(r,"Customer Organisation"))) if any(value(r,"Customer Organisation") for r in documented) else "Implementation records available.")
         why.append(cl["Classification basis"])
         unresolved_text="; ".join(value(criteria[c],"Product criterion") for c in unresolved[:3])
-        out.append({"Product ID":pid,"Company ID":cid,"Company":value(companies.get(cid,{}),"Company Name"),"Product":value(p,"Product Name"),"Family ID":family_root(products,pid),"Role":role,"Source classification":cl["Source role"],"Review track":tier,"Order":order,"Why care":" · ".join(why),"Unresolved":unresolved_text or "No unresolved strategic criterion in selected set","Buyer / procurement overlap":"Unconfirmed — shared procurement decision not recorded in structured fields","Space market evidence":market,"Functional overlap":x,"Recorded full":len(full),"Recorded partial":len(partial),"Technical or stronger":len(strong),"Implementation records":len(documented),"Recorded overlap fraction":fraction,"Commercial status":value(p,"Commercial Status") or "Unknown","Classification basis":cl["Classification basis"]})
+        out.append({"Product ID":pid,"Company ID":cid,"Company":value(companies.get(cid,{}),"Company Name"),"Product":value(p,"Product Name"),"Family ID":family_root(products,pid),"Role":role,"Source classification":cl["Source role"],"Review track":tier,"Order":order,"Why care":" · ".join(why),"Unresolved":unresolved_text or "No unresolved strategic criterion in selected set","Buyer / procurement overlap":"Unconfirmed — shared procurement decision not recorded in structured fields",**position,"Decision":decision_for(role),"Space market evidence":market,"Functional overlap":x,"Recorded full":len(full),"Recorded partial":len(partial),"Technical or stronger":len(strong),"Implementation records":len(documented),"Recorded overlap fraction":fraction,"Commercial status":value(p,"Commercial Status") or "Unknown","Classification basis":cl["Classification basis"]})
     return pd.DataFrame(out).sort_values(["Order","Recorded overlap fraction","Technical or stronger","Implementation records","Product"],ascending=[True,False,False,False,True]) if out else pd.DataFrame()
 
 def priority_families(rows):

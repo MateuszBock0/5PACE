@@ -21,11 +21,12 @@ from excel_archive import download_analysis, workbook_bytes, MIME
 from archive_ui import archive_page
 from founder_ui import PRIMARY, founder_page
 from decision import dataset_label
+from pdf_export_ui import export_panel
 from advanced_ui import (commercial_page, product_page, strategic_page, evolution_panel, research_panel, import_panel)
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.markdown("**5PACE / INTELLIGENCE**")
-st.caption("v1.4.2-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.4.3-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -59,8 +60,11 @@ PAGES=["Command Centre","Overview","Companies & products","Capability matrix","E
 primary=st.sidebar.radio("Workspace",PRIMARY,index=0 if data is not None else len(PRIMARY)-1,key="founder_workspace")
 if primary=="Advanced Analytics":
     page=st.sidebar.radio("Advanced workspace",PAGES,index=0 if data is not None else len(PAGES)-1)
+    if data is not None:export_panel(st,data,cfg,snapshots,current,head,demo_mode,page)
 else:
-    if data is not None: founder_page(st,primary,data,cfg,snapshots,current,demo_mode)
+    if data is not None:
+        founder_page(st,primary,data,cfg,snapshots,current,demo_mode)
+        export_panel(st,data,cfg,snapshots,current,head,demo_mode,primary)
     else: st.info("Open Advanced Analytics → Synchronisation to configure the source, or Excel Archive to inspect existing snapshots.")
     st.stop()
 
@@ -315,6 +319,7 @@ elif page=="Strategic intelligence":
     strategic_page(st,data,mat,cnames,cfg,show,demo_mode)
 elif page=="Reports":
     st.header("Export and reporting")
+    export_panel(st,data,cfg,snapshots,current,head,demo_mode,page,location="main")
     st.caption("Exports contain local intelligence. Do not commit reports or snapshots into a public repository.")
     st.download_button("Download full snapshot JSON",canonical(data),file_name="cie_snapshot.json",mime="application/json")
     try:

@@ -8,6 +8,7 @@ from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
 from founder import summaries,priority_families,strategic_criteria,profile_records,timeline,advantage_summary,evidence_detail,profile_findings,recorded_market_changes,brief_criteria,WORKFLOW_EXAMPLES,search_companies,short_reason,relationship_lane,commercial_summary
 from excel_archive import download_analysis
+from founder import strategic_map_cohort,map_exclusions
 from decision import CUSTOMER_LANES,FUNCTION_LANES,company_brief,differentiation_questions,signals,importance_lane
 
 PRIMARY=["Command Centre","Competitor Explorer","Market Positioning","Competitive Advantage","Intelligence Monitor","Advanced Analytics"]
@@ -22,6 +23,7 @@ def navigate(st,pid=None,cid=None,page="Competitor Explorer",criterion=None,regi
         st.session_state["profile_section_pending"]={"Deployments":"Deployments","Commercial Intelligence":"Pricing","Observations":"Evidence"}.get(register,"Compare" if criterion else "Overview")
         st.session_state["profile_criterion_pending"]=criterion
         st.session_state["profile_reference_pending"]=(register,reference) if reference else None
+        st.session_state.pop("profile_reference_active",None)
 
 def chart_route(st,key,data,kind):
     event=st.session_state.get(key,{})
@@ -214,7 +216,10 @@ def explorer(st,data,cfg,rows):
     pending_section=st.session_state.pop("profile_section_pending",None)
     if pending_section:st.session_state["profile-section"]=pending_section
     section=st.radio("Profile section",["Overview","Products","Compare","Deployments","Pricing","Evidence","Timeline"],horizontal=True,key="profile-section")
-    reference=st.session_state.pop("profile_reference_pending",None)
+    incoming=st.session_state.pop("profile_reference_pending",None)
+    if incoming:st.session_state["profile_reference_active"]=(cid,pid,incoming)
+    reference_record=st.session_state.get("profile_reference_active")
+    reference=reference_record[2] if reference_record and reference_record[:2]==(cid,pid) else None
     if reference and reference[0] in records:
         field={"Observations":"Observation ID","Deployments":"Deployment ID","Commercial Intelligence":"Commercial Record ID"}.get(reference[0])
         exact=[x for x in records[reference[0]] if field and value(x,field)==reference[1]]
@@ -253,8 +258,8 @@ def positioning(st,data,cfg,rows):
     st.caption("Which products address similar AIT workflows and have credible space-market relevance?")
     if rows.empty:return
     f=priority_families(rows)
-    candidates=f[f.Order<4]
-    default=(candidates if not candidates.empty else f).head(12)["Product ID"].tolist()
+    candidates=strategic_map_cohort(rows)
+    default=(candidates if not candidates.empty else f).head(30)["Product ID"].tolist()
     names=rows.set_index("Product ID").Product.to_dict()
     ids=st.multiselect("Products on strategic map",list(names),default=default,format_func=names.get,key="founder-map-products")
     d=rows[rows["Product ID"].isin(ids)].copy()
@@ -382,19 +387,28 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     groups=[("Visual technology benchmark",lead,"Highest recorded overlap in selected visual / adjacent roles"),
             ("Market-facing visual candidates",market,"Recorded spacecraft target customers; adoption may be unresolved"),
             ("Budget substitution candidates",f[f.Order==1],"Workflow / purchasing alternatives; same budget unconfirmed"),
-            ("Adjacent / emerging watch",f[f.Order.isin([2,3])],"Investigate market entry and unresolved classification")]
+            ("Research / emerging watch",f[f.Role=="Research / emerging entrant"],"Research demonstrators and potential entrants; commercial offer unconfirmed")]
     for col,(title,g,caption) in zip(cards,groups):
         with col:
             with st.container(border=True):
                 st.caption(title)
-                st.markdown("**"+(" · ".join(g.Company.drop_duplicates().head(2)) if not g.empty else "Unresolved")+"**")
+                st.markdown("**"+(" · ".join(g.Company.drop_duplicates().head(1)) if not g.empty else "Unresolved")+"**")
                 st.caption(caption)
                 if not g.empty:
                     first=g.iloc[0]
                     open_profile(st,first["Product ID"],first["Company ID"],"strategic-card-"+title)
     st.subheader("Technology × customer positioning")
-    mapped=f[f.Order<3].head(10)
-    render_map(st,data,mapped if not mapped.empty else f.head(8),"landing-map",True)
+    scope=st.selectbox("Map scope",["Strategic + research","Commercial shortlist","Research & emerging","All products"],key="landing-map-scope")
+    mapped=strategic_map_cohort(rows,scope)
+    if mapped.empty:st.info("No products in the selected scope.")
+    else:render_map(st,data,mapped,"landing-map",True)
+    st.caption(f"{len(mapped)} of {len(rows)} product records shown. Research entrants are included by default as a separate competitive role; absence is not a low-threat finding.")
+    with st.expander("Why are other products not on this map?"):
+        excluded=map_exclusions(rows,mapped)
+        if excluded.empty:st.caption("All products are included.")
+        else:
+            table(st,excluded[["Company","Product","Role","Reason not shown"]],"map-exclusions")
+            select_product(st,excluded,"excluded-map")
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")

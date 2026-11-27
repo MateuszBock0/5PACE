@@ -4,8 +4,8 @@ headless = false
 [browser]
 gatherUsageStats = false
 [theme]
-base = "dark"
-primaryColor = "#87A9EF"
-backgroundColor = "#101827"
-secondaryBackgroundColor = "#1B263B"
-textColor = "#E5EDF8"
+base = "light"
+primaryColor = "#087E7B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EAF0F3"
+textColor = "#172B3A"

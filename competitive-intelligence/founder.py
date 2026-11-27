@@ -130,3 +130,42 @@ def recorded_market_changes(before,after):
                 pid=value(r,"Product ID")
                 rows.append({"Product ID":pid,"Product":value(products.get(pid,{}),"Product Name"),"Register":tab,"Record":ident,"Recorded change":"; ".join(changed),"Interpretation":"New or revised source knowledge; actual product change not established"})
     return pd.DataFrame(rows,columns=["Product ID","Product","Register","Record","Recorded change","Interpretation"])
+
+# These are criterion references from the UX specification, not competitor data.
+BRIEF_CRITERIA=["AV-CR-003","AV-CR-004","AV-CR-002","AV-CR-020","AV-CR-005","AV-CR-008","AV-CR-022"]
+WORKFLOW_EXAMPLES=[("Procedure planning","AV-CR-009"),("Physical assembly","AV-CR-003"),("Execution control","AV-CR-004"),("Testing / measurements","AV-CR-015"),("Evidence / reporting","AV-CR-002")]
+def brief_criteria(data):
+    c=registry(data,CRITERIA,"Criterion ID")
+    ids=[i for i in BRIEF_CRITERIA if i in c]
+    return ids or strategic_criteria(data)
+
+def search_companies(data,q):
+    companies=registry(data,"Companies","Company ID")
+    products=registry(data,"Products","Product ID")
+    q=q.strip().casefold()
+    return [c for c in sorted(companies,key=lambda c:value(companies[c],"Company Name").casefold())
+        if not q or q in " ".join(value(companies[c],f) for f in ("Company Name","Alternative Names","Canonical Domain")).casefold()
+        or any(q in " ".join(value(p,f) for f in ("Product Name","Alternative Names","Product Category","Primary Use Case","Product Description")).casefold()
+               for p in products.values() if value(p,"Company ID")==c)]
+
+def short_reason(r):
+    # Keep the full source-linked rationale in the profile.
+    return str(r["Why care"]).split(" · ")[0] if r["Why care"] else "Competitive relationship not established."
+
+def relationship_lane(r):
+    return {"Direct visual AIT candidate":"Visual AIT candidates",
+            "Workflow / procurement substitute candidate":"Workflow / budget candidates",
+            "Cross-industry competitor candidate":"Cross-industry technology",
+            "Enabling technology":"Complementary / enabling",
+            "Complementary system":"Complementary / enabling"}.get(r["Role"],"Unresolved / other")
+
+def commercial_summary(records):
+    rows=records.get("Commercial Intelligence",[])
+    out=[]
+    for r in rows:
+        prices=[]
+        for f in ("Subscription Cost","One-time Licence Cost","Deployment Cost","Integration Cost"):
+            if value(r,f): prices.append(f+": "+value(r,f)+" "+value(r,"Currency"))
+        text=" · ".join(x for x in [value(r,"Business Model"),value(r,"Pricing Model"),*prices,value(r,"Price Basis"),value(r,"Applicable Date")] if x)
+        if text:out.append(text)
+    return out or ["Commercial model / pricing not recorded."]

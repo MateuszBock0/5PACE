@@ -1,0 +1,29 @@
+name: CIE UX screenshots
+on:
+  pull_request:
+    paths:
+      - 'competitive-intelligence/**'
+      - '.github/workflows/cie-ux-screens.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: competitive-intelligence/requirements.txt
+      - run: python -m pip install -r competitive-intelligence/requirements.txt playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python competitive-intelligence/scripts/capture_ux.py ux-screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 5PACE-v1.4.1-UX-screenshots
+          path: ux-screenshots/
+          if-no-files-found: error
+          retention-days: 14

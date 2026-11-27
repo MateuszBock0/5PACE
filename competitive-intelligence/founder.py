@@ -16,6 +16,8 @@ POSITIVE={"Supported","Partially supported"}
 CORE_ROLES={"Direct visual AIT candidate","Workflow / procurement substitute candidate"}
 def strategic_criteria(data):
     criteria=registry(data,CRITERIA,"Criterion ID")
+    fixed=[c for c in CORE_IDS if c in criteria]
+    if fixed:return fixed
     selected=[]
     for pat in CORE_PATTERNS:
         for cid,r in criteria.items():
@@ -58,7 +60,7 @@ def summaries(data):
         position=customer_position(p,deps)
         why=[]
         if full or partial:
-            why.append("Recorded overlap: "+ "; ".join(value(criteria.get(c,{}),"Product criterion") or c + (" (partial)" if c in partial else "") for c in (full+partial)[:3]))
+            why.append("Recorded overlap: "+ "; ".join((value(criteria.get(c,{}),"Product criterion") or c) + (" (partial)" if c in partial else "") for c in (full+partial)[:3]))
         if documented: why.append("Implementation records: "+", ".join(dict.fromkeys(value(r,"Customer Organisation") for r in documented if value(r,"Customer Organisation"))) if any(value(r,"Customer Organisation") for r in documented) else "Implementation records available.")
         why.append(cl["Classification basis"])
         unresolved_text="; ".join((value(criteria.get(c,{}),"Product criterion") or c) for c in unresolved[:3])
@@ -183,7 +185,7 @@ def eligible(score,customer):
     return score>=.60 or (score>=.40 and customer in SPACE_CUSTOMER)
 
 def axis_eligible(rows):
-    return (rows["Recorded overlap fraction"]>=.60)|((rows["Recorded overlap fraction"]>=.40)&rows["Customer position"].isin(SPACE_CUSTOMER))
+    return pd.Series([eligible(score,customer) for score,customer in zip(rows["Recorded overlap fraction"],rows["Customer position"])],index=rows.index,dtype=bool)
 
 def strategic_map_cohort(rows,scope=DEFAULT_MAP_SCOPE,limit=10):
     """One dynamic product-level default. Legacy explicit scopes only for compatibility."""

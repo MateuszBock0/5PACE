@@ -42,6 +42,11 @@ def text(v):
     except (ValueError,TypeError):pass
     return str(v)
 
+def cohort_signals(data,ids,company_ids):
+    """The default and explicit PDF scope have identical filtering semantics."""
+    sig=signals(data)
+    return sig[sig["Product ID"].isin(ids)|((sig["Product ID"]=="")&sig["Company ID"].isin(company_ids))]
+
 def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None):
     if kind not in REPORTS:raise ValueError("Unknown report type")
     captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
@@ -188,8 +193,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
             table(["Criterion","AIT-VISTA","Competitor","Evidence / date / source"],values,[1.5,.75,.85,2.6],(1,2))
     def monitor():
         heading("Intelligence monitor")
-        sig=signals(data)
-        if product_ids is not None:sig=sig[sig["Product ID"].isin(ids)|((sig["Product ID"]=="")&sig["Company ID"].isin(d["Company ID"] if not d.empty else []))]
+        sig=cohort_signals(data,ids,d["Company ID"].tolist() if not d.empty else [])
         add("Most recent 30 recorded signals. Event dates, commercial applicable dates and research discovery dates are distinct.")
         table(["Date / type","Company / development","Decision, limitations and source"],[(r.Date+"\n"+r["Date basis"],value(companies.get(r["Company ID"],{}),"Company Name")+"\n"+r.Development,r["Strategic implication"]+"\n"+r.Limitations+"\n"+r.Reference+"\n"+r.Source) for _,r in sig.head(30).iterrows()],[1,2,2])
         if ids and criteria:

@@ -5,6 +5,7 @@
 - Fixed eight-criterion recorded-overlap score and inclusive customer-evidence thresholds.
 - Shared default cohort, percentage maps, explicit coverage, Space Watch, custom selection and reset.
 - PDF scope and percentage map aligned; dark theme retained.
+- QA correction: programmatic Intelligence Monitor PDF uses the same scope as panel exports; partial-support labels retained in rationale.
 
 ## 1.4.6-rc1 — Dark mode and visual contrast
 

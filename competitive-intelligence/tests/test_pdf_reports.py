@@ -19,3 +19,11 @@ def test_research_entrant_is_visible_independently_of_commercial_rank():
     assert "DEMO-P1" not in set(strategic_map_cohort(r,"Commercial shortlist")["Product ID"])
     assert set(strategic_map_cohort(r,"All products")["Product ID"])==set(r["Product ID"])
     assert "Reason not shown" in map_exclusions(r,shown)
+
+def test_pdf_monitor_signals_obey_default_and_empty_cohort(monkeypatch):
+    import pandas as pd
+    import pdf_reports
+    signals=pd.DataFrame([{"Product ID":"P1","Company ID":"C1"},{"Product ID":"P2","Company ID":"C2"},{"Product ID":"","Company ID":"C1"},{"Product ID":"","Company ID":"C2"}])
+    monkeypatch.setattr(pdf_reports,"signals",lambda data:signals)
+    assert pdf_reports.cohort_signals({},["P1"],["C1"]).index.tolist()==[0,2]
+    assert pdf_reports.cohort_signals({},[],[]).empty

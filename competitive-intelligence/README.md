@@ -173,3 +173,5 @@ Dark is the default native Streamlit theme. Charts use shared theme-aware stylin
 
 ## v1.4.7 — unified strategic core (40% / 60%)
 Default founder map, Threat Watch, response, advantage, workflow and PDF cohort share one product predicate: >=60% recorded overlap OR >=40% with Space AIT target/case evidence. Eight fixed IDs 003/004/002/020/005/008/022/023, full=1 partial=.5, fixed denominator 8; all other states earn zero positive credit, not proof of absence. Evidence coverage and determinate coverage are separate. Space Watch / research and All products, custom selection and reset are available. No source changes or fallback selection. Dark mode retained.
+
+Intelligence Monitor PDF applies the chosen product cohort even for programmatic default exports. Company-only signals are included only for companies represented in that cohort; the live monitor remains an unrestricted research view.

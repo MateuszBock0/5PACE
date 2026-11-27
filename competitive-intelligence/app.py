@@ -16,11 +16,13 @@ from analytics import (frame, current_assessments, active_capabilities, matrix, 
                        sensitivity, research_gaps, similarity, clusters, graph, capability_gaps, DISPLAY)
 from demo import fixture
 from command_ui import command_page
+from excel_archive import download_analysis, workbook_bytes, MIME
+from archive_ui import archive_page
 from advanced_ui import (commercial_page, product_page, strategic_page, evolution_panel, research_panel, import_panel)
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.title("5PACE | Competitive Intelligence Engine")
-st.caption("v1.3.0-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.3.1-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -46,16 +48,21 @@ if st.sidebar.button("Refresh interface"):
 if st.sidebar.button("Sync data now",disabled=demo_mode):
     subprocess.Popen([sys.executable,str(ROOT/"sync.py"),"--force"],cwd=str(ROOT))
     st.sidebar.info("Sync started in a separate process. Refresh interface to inspect its result.")
-PAGES=["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]
+PAGES=["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Excel Archive","Synchronisation"]
 page=st.sidebar.radio("Workspace",PAGES,index=0 if data is not None else len(PAGES)-1)
 
 def show(df, key=None):
     st.dataframe(df,use_container_width=True,hide_index=True)
     if key and isinstance(df,pd.DataFrame):
         st.download_button("Export CSV",df.to_csv(index=False).encode("utf-8"),file_name=key+".csv",key="csv-"+key,mime="text/csv")
+        download_analysis(st,df,"app-"+key,key)
 
 def label_dict(data,tab,idcol,namecol):
     return {value(r,idcol):f"{value(r,namecol)} · {value(r,idcol)}" for r in records(data,tab)}
+
+if page=="Excel Archive":
+    archive_page(st,snapshots,head,demo_mode)
+    st.stop()
 
 if page=="Synchronisation":
     st.header("Synchronisation centre")
@@ -297,6 +304,10 @@ elif page=="Reports":
     st.header("Export and reporting")
     st.caption("Exports contain local intelligence. Do not commit reports or snapshots into a public repository.")
     st.download_button("Download full snapshot JSON",canonical(data),file_name="cie_snapshot.json",mime="application/json")
+    try:
+        st.download_button("Download full snapshot Excel",workbook_bytes(data,None if demo_mode else current),file_name="cie_snapshot.xlsx",mime=MIME,key="reports-full-xlsx")
+    except (ValueError,TypeError,OverflowError) as exc:
+        st.warning("Snapshot Excel export unavailable: "+str(exc)[:200])
     gaps=research_gaps(data,mat,cfg.get("priority_capabilities",[]))
     title="5PACE Competitive Intelligence Report"+(" — SYNTHETIC DEMO" if demo_mode else "")
     doc="<html><head><meta charset='utf-8'><title>"+html.escape(title)+"</title><style>body{font:15px system-ui;margin:32px;color:#182439}table{border-collapse:collapse;font-size:12px}td,th{padding:6px;border:1px solid #ccd3db;vertical-align:top}h1,h2{color:#203861}</style></head><body>"

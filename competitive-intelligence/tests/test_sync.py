@@ -5,6 +5,7 @@ import sync
 def test_offline_fallback_and_stale(monkeypatch,tmp_path):
     db=tmp_path/"test.db"
     monkeypatch.setattr(sync,"DATA",tmp_path)
+    monkeypatch.setattr(sync,"ARCHIVE_ROOT",tmp_path/"Excel Archive")
     monkeypatch.setattr(sync,"connect",lambda:core.connect(db))
     monkeypatch.setattr(sync,"config",lambda:{"refresh_interval_hours":24})
     monkeypatch.setattr(sync,"download",lambda cfg:fixture())

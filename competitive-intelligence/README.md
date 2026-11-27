@@ -1,6 +1,6 @@
 # Competitive Intelligence Engine
 
-Version 1.3.0-rc1 — market positioning release candidate.
+Version 1.3.1-rc1 — Excel archive and data export release candidate.
 
 ## First-time installation and authentication
 
@@ -138,3 +138,10 @@ Company portfolio bounds are maxima of individual products, with both representa
 Even under the permissive recorded-verdict scenario, an advantage is labelled substantiated only when all applicable competitor comparisons have technical-documentation-or-stronger evidence. A company chart includes the AIT-VISTA reference; proximity supports workflow stages and a separate commercial-readiness view for provisional substitution candidates. Workflow output includes both averaged stage coverage and minimum-criterion conjunctive coverage as a conservative proxy, not integration evidence.
 
 The radar uses matching colours for each product's lower/upper outlines. The map supports product filtering and exports the selected axes, evidence scenario and baseline. Non-stage criteria are shown separately as cross-cutting/unassigned workflow scope and still included in overall scoring. Editing a legacy criterion profile preserves optional positioning fields.
+
+
+## Excel Archive (v1.3.1-rc1)
+
+The repository root contains an ignored local folder `Excel Archive/`. After a validated source sync commits the SQLite snapshot, a values-only XLSX is written atomically as `Excel Archive/YYYY-MM/Competition_YYYY-MM-DD_HH-MM-SSZ_<hash>.xlsx` (original snapshot capture UTC, not export time). The latest accepted snapshot is `Excel Archive/Competition_LATEST.xlsx`. Identical content does not create a new dated copy. An unchanged or fresh local sync repairs missing latest exports. Excel write failures, including a file open in Excel, are reported separately and do not roll back a successful SQLite sync. The archive is not authoritative; retain the database. The XLSX contains all captured worksheets, normalized headers and captured values (mostly display text); it is not a clone of Google Sheets formulas, formatting, original empty grid, validation or metadata. Strings remain literal cells, never formulas.
+
+Run `REBUILD_EXCEL_ARCHIVE.bat` once after updating to reconstruct every distinct historical snapshot without network access. Existing valid archives are retained; damaged packages or mismatched snapshot identifiers are regenerated. The latest export follows latest_hash, not the restored current_hash. The UI Excel Archive workspace allows offline rebuild, historical snapshot downloads and opening the Windows folder. Reports also exports the currently displayed full snapshot as XLSX. Existing CSV analysis exports remain, with XLSX alternatives in the legacy analytical tables, Command Centre and Market Positioning, including the full eight-field research queue. The archive and credentials remain local; never commit private XLSX files.

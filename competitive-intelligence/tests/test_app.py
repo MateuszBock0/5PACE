@@ -23,7 +23,7 @@ def test_workspaces_with_mapping(monkeypatch,tmp_path):
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=40)
     app.run()
     assert not app.exception
-    for page in ["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Synchronisation"]:
+    for page in ["Command Centre","Overview","Companies & products","Capability matrix","Evidence & deployments","Landscape & threats","Knowledge graph","Research gaps","Similarity & clustering","Technology gaps","History & evolution","Product intelligence","Strategic intelligence","Reports","Excel Archive","Synchronisation"]:
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception, f"{page}: {app.exception}"
 

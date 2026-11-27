@@ -49,7 +49,7 @@ def cohort_signals(data,ids,company_ids):
     sig=signals(data)
     return sig[sig["Product ID"].isin(ids)|((sig["Product ID"]=="")&sig["Company ID"].isin(company_ids))]
 
-def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None,map_product_ids=None,queue_only=False,portfolio_company_ids=None):
+def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None,map_product_ids=None,queue_only=False,portfolio_company_ids=None,watchlist_selection=None,watchlist_threshold=.20,watchlist_min_gaps=3):
     if kind not in REPORTS:raise ValueError("Unknown report type")
     captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
     fonts()
@@ -255,7 +255,20 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         for title,items in [("Validation errors",errors),("Validation warnings",warnings),("Matrix findings",mismatches)]:
             add(title,"sub")
             table(["Finding"],[[x] for x in items])
-    add("5PACE / INTELLIGENCE","small");add(kind,"title")
+    def watchlist_section():
+        from company_watchlist import watchlist
+        w,details=watchlist(data,watchlist_threshold,watchlist_min_gaps)
+        w=w[w["Company ID"].isin(watchlist_selection)]
+        heading("Company Watchlist")
+        add(f"Selected {len(w)} companies; technology overlap strictly above {watchlist_threshold:.0%}; minimum {watchlist_min_gaps} distinct gap criteria. Independent of strategic core. Space company evidence is not inherited by products.")
+        table(["Company / priority","Recorded overlap / gaps","Watch reason / next action"],[(r.Company+"\n"+r.Priority,f'{r["Best Product Overlap"]:.2%} best / {r["Portfolio Overlap"]:.2%} portfolio\n{r["Gap criteria"]} distinct gaps; {r["Unverified Claims"]} weak claims; {r["Unassessed"]} unassessed pairs',r["Watch Reason"]+"\n"+r["Next Action"]) for _,r in w.iterrows()],[1.2,1.2,2.4])
+        for _,r in w.iterrows():
+            add(r.Company+" | "+r["Company ID"],"sub")
+            add("\n".join(k+": "+str(r[k]) for k in ["Space Target","Space Confirmed","Reported space implementation","Space research / other signal","Space evidence IDs","Space sources","Research basis"] if r[k]))
+            g=details[r["Company ID"]]
+            g=g[g["Gap reason"]!=""]
+            table(["Product / criterion","Verdict / gap","Evidence / source"],[(x.Product+"\n"+x["Criterion ID"]+" | "+x.Criterion,x.Verdict+"\n"+x["Gap reason"],x["Comparison IDs"]+"\n"+x["Evidence level"]+"\n"+x["Source URLs"]) for _,x in g.iterrows()],[1.5,1.2,2])
+    add("5PACE / INTELLIGENCE","small");add("Company Watchlist" if watchlist_selection is not None else kind,"title")
     add("INTERNAL • "+mode,"sub")
     add("Captured UTC: "+(captured or "Not recorded")+" | Source: "+(source or "Not recorded"))
     add("Snapshot: "+(snapshot_hash or digest(data)),"small")
@@ -267,7 +280,8 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         portfolio_section()
         threat()
     funcs={"Strategic overview":overview_with_threat,"Competitor profile":profile_report,"Market positioning & workflow":market,"Competitive advantage":advantage,"Intelligence monitor":monitor,"QA & data integrity":qa}
-    if queue_only:queue_section(True)
+    if watchlist_selection is not None:watchlist_section()
+    elif queue_only:queue_section(True)
     elif kind=="Combined strategic report":
         for i,fn in enumerate([overview_with_threat,market,advantage,monitor,qa]):
             if i:story.append(PageBreak())

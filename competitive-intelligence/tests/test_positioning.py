@@ -71,3 +71,32 @@ def test_taxonomy_workflow_and_sensitivity():
     assert (r["Best possible rank"]<=r["Worst possible rank"]).all()
     assert r["Worst possible rank"].max()<=2
     assert r.equals(sensitivity_analysis(d,m,cfg,"As-Is",{"CR1":1},10)[0])
+
+def test_weak_negative_does_not_substantiate_advantage():
+    d=comparison_fixture()
+    d["Comparison Assessment"]["rows"][1]["Evidence level"]="Vendor claim"
+    l,h,s,_=interval_arrays(d,direct_matrix(d,["DEMO-P2"]),{})
+    result=advantage_portfolio(d,l,h,s,{},"As-Is").iloc[0]
+    assert result.Finding=="Scenario advantage — weaker competitor evidence"
+    assert result.Decision!="Protect / validate value"
+
+def test_portfolio_does_not_combine_complementary_products():
+    d=comparison_fixture()
+    for r in d["Products"]["rows"]: r["Company ID"]="DEMO-CO-1"
+    p=pd.DataFrame([
+        {"Product ID":VISTA,"Company ID":"__5PACE__","Company":"5PACE","Product":"Reference","Role":"Reference","Family ID":VISTA,ALL+" lower":1.,ALL+" upper":1.},
+        {"Product ID":"p1","Company ID":"co","Company":"Company","Product":"P1","Role":"Direct","Family ID":"f",ALL+" lower":.5,ALL+" upper":.5},
+        {"Product ID":"p2","Company ID":"co","Company":"Company","Product":"P2","Role":"Direct","Family ID":"f",ALL+" lower":.5,ALL+" upper":1.}])
+    r=company_positions(p).iloc[0]
+    assert r["Portfolio lower"]==.5 and r["Portfolio upper"]==1.
+    assert r["Explicit families"]==1
+    assert r["Potential product ID"]=="p2"
+
+def test_workflow_minimum_is_not_average():
+    l=pd.DataFrame([[1,1],[1,0]],index=[VISTA,"p"],columns=["a","b"])
+    h=l.copy()
+    t=pd.DataFrame({"Criterion ID":["a","b"],"Workflow stages":["Execute & capture","Execute & capture"]})
+    w,b=workflow_benchmark(l,h,t)
+    r=w[w["Product ID"]=="p"].iloc[0]
+    assert r.Lower==.5 and r["All mapped criteria lower"]==0
+    assert r["Delta vs AIT-VISTA lower"]==-.5

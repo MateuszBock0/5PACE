@@ -7,7 +7,7 @@ from command_engine import direct_current, registry, ASSESS
 from advanced_ui import save_settings
 from product_intelligence import CRITERIA
 from positioning import (VISTA,ALL,DIMENSIONS,COMMERCIAL,WORKFLOWS,EVIDENCE_MODES,taxonomy,axis_groups,
-    interval_arrays,positioning_table,proximity,company_positions,advantage_portfolio,workflow_benchmark,sensitivity_analysis)
+    interval_arrays,positioning_table,proximity,company_positions,advantage_portfolio,workflow_groups,workflow_benchmark,sensitivity_analysis)
 
 def table(st,d,key):
     st.dataframe(d,use_container_width=True,hide_index=True)
@@ -83,18 +83,31 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         table(st,pd.DataFrame(rows),"capability-profile")
         st.caption("Solid = lower bound; dotted = upper bound. Dimensions are an analytical grouping, not an independent market-wide requirements standard.")
     elif view=="Competitive proximity":
-        dim=st.selectbox("Proximity dimension",list(groups),key="pos-prox-dim")
-        sim=proximity(lo,hi,{dim:groups[dim]},weights).merge(pos[["Product ID","Product","Company","Role","Family ID"]],on="Product ID")
+        prox_groups={**groups,**{"Workflow: "+stage:ids for stage,ids in workflow_groups(tax).items() if ids}}
+        dim=st.selectbox("Proximity dimension",list(prox_groups),key="pos-prox-dim")
+        sim=proximity(lo,hi,{dim:prox_groups[dim]},weights).merge(pos[["Product ID","Product","Company","Role","Family ID","Commercial readiness lower","Commercial readiness upper","Space relevance lower","Space relevance upper"]],on="Product ID")
         sim=sim.sort_values(["Similarity lower","Similarity upper","Product ID"],ascending=[False,False,True])
         st.subheader("Strongest recorded functional proximity")
         interval_chart(st,sim.head(15),"Similarity lower","Similarity upper","Product","Similarity to selected AIT-VISTA baseline")
         st.subheader("Highest unresolved potential proximity")
         table(st,sim.sort_values(["Similarity upper","Similarity lower","Product ID"],ascending=[False,False,True]),"proximity")
-        st.caption("Similarity is 1 minus weighted absolute criterion distance. With an all-supported reference it equals scope coverage; it cannot reveal capabilities outside our criteria. Commercial substitution is not inferred from proximity.")
+        st.subheader("Commercially relevant substitution candidates")
+        candidates=sim[sim.Role.isin(["Direct visual AIT candidate","Workflow / procurement substitute candidate","Cross-industry competitor candidate"])].copy()
+        if candidates.empty: st.info("No classified substitution candidates in the selected cohort.")
+        else:
+            candidates["Proximity width"]=candidates["Similarity upper"]-candidates["Similarity lower"]
+            candidates["Commercial width"]=candidates["Commercial readiness upper"]-candidates["Commercial readiness lower"]
+            candidates["Zero"]=0.
+            fig=px.scatter(candidates,x="Similarity lower",y="Commercial readiness lower",color="Role",hover_name="Product",error_x="Proximity width",error_x_minus="Zero",error_y="Commercial width",error_y_minus="Zero",hover_data=["Similarity upper","Commercial readiness upper","Company"])
+            fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%"},yaxis={"range":[0,1.05],"tickformat":".0%"},height=430)
+            st.plotly_chart(fig,use_container_width=True)
+        st.caption("Similarity is 1 minus weighted absolute criterion distance. With an all-supported reference it equals scope coverage; it cannot reveal capabilities outside our criteria. Commercial substitution remains a provisional classification, not inferred from proximity.")
     elif view=="Company portfolios":
         axis=st.selectbox("Company positioning dimension",axes,key="pos-company-axis")
         companies=company_positions(pos,axis)
-        interval_chart(st,companies.head(15),"Portfolio lower","Portfolio upper","Company","Best individual product exposure by company")
+        own=pos[pos["Product ID"]==VISTA].iloc[0]
+        comparison=pd.concat([pd.DataFrame([{"Company":"5PACE · AIT-VISTA ("+mode+")","Portfolio lower":own[axis+" lower"],"Portfolio upper":own[axis+" upper"]}]),companies.head(15)],ignore_index=True)
+        interval_chart(st,comparison,"Portfolio lower","Portfolio upper","Company","Best individual product exposure by company — with AIT-VISTA reference")
         table(st,companies,"companies")
         if not companies.empty:
             company=st.selectbox("Inspect company portfolio",companies["Company ID"].tolist(),format_func=companies.set_index("Company ID").Company.to_dict().get,key="pos-company")
@@ -143,7 +156,7 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         st.plotly_chart(fig,use_container_width=True)
         table(st,stages,"workflow-stages")
         table(st,bottleneck,"workflow-bottlenecks")
-        st.caption("Stages may share criteria. The weakest-stage interval identifies a potential coverage bottleneck, not end-to-end process qualification. Separate features never prove integrated operation.")
+        st.caption("Stages may share criteria. The weakest-stage interval identifies a potential coverage bottleneck. All mapped criteria bounds use the minimum criterion score (a conjunctive coverage proxy), not an average or proof of workflow integration. No full workflow qualification is claimed.")
         with st.expander("Workflow integration evidence to review"):
             for p in chosen:
                 st.markdown("**"+names[p]+"**")

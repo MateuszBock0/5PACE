@@ -168,6 +168,7 @@ def advantage_portfolio(data,lo,hi,state,cfg,mode):
     A functional advantage needs a strictly positive lower difference; demand is separate."""
     products=registry(data,"Products","Product ID")
     criteria=registry(data,CRITERIA,"Criterion ID")
+    current=direct_current(data)
     ids=[p for p in lo.index if p!=VISTA]; families={}
     for p in ids: families.setdefault(family_root(products,p),[]).append(p)
     rows=[]
@@ -183,10 +184,14 @@ def advantage_portfolio(data,lo,hi,state,cfg,mode):
         # Presence of any positive support, not a jointly integrated offer.
         positive_lower=sum(any(p in applicable and lo.loc[p,c]>0 for p in group) for group in fam)/len(fam)
         positive_upper=sum(any(p in applicable and hi.loc[p,c]>0 for p in group) for group in fam)/len(fam)
+        # A permissive evidence scenario can explore recorded claims, but must
+        # not promote a vendor-only negative verdict into a substantiated edge.
+        strong=all(EVIDENCE_RANK.get(current.get((p,c),{}).get("evidence",""),-1)>=3 for p in applicable)
+        strong_positive=any(EVIDENCE_RANK.get(current.get((p,c),{}).get("evidence",""),-1)>=3 and lo.loc[p,c]>b for p in applicable)
         if mode!="As-Is": finding="Planning scenario"
-        elif dl>1e-9: finding="Substantiated functional advantage"
-        elif dh< -1e-9: finding="Substantiated functional disadvantage"
-        elif abs(dl)<1e-9 and abs(dh)<1e-9: finding="Functional parity with best recorded product"
+        elif dl>1e-9: finding="Substantiated functional advantage" if strong else "Scenario advantage — weaker competitor evidence"
+        elif dh< -1e-9: finding="Substantiated functional disadvantage" if strong_positive else "Scenario disadvantage — weaker competitor evidence"
+        elif abs(dl)<1e-9 and abs(dh)<1e-9: finding="Functional parity with best recorded product" if strong else "Scenario parity — weaker competitor evidence"
         elif dh>1e-9 and dl>=-1e-9: finding="Potential differentiation — unresolved"
         else: finding="Insufficient comparative evidence"
         importance=r.get("customer_importance","Unknown")
@@ -195,7 +200,7 @@ def advantage_portfolio(data,lo,hi,state,cfg,mode):
         rows.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"Finding":finding,"Delta lower":dl,"Delta upper":dh,
                      "Rarity lower":1-positive_upper,"Rarity upper":1-positive_lower,"Customer importance":importance,
                      "Customer demand":"Validated (local declaration)" if demand else "Unvalidated","Demand reference":r.get("demand_reference",""),
-                     "Decision":"Protect / validate value" if dl>1e-9 and mode=="As-Is" else "Review gap" if dh< -1e-9 and mode=="As-Is" else "Investigate / maintain parity"})
+                     "Decision":"Protect / validate value" if finding=="Substantiated functional advantage" else "Review gap" if finding=="Substantiated functional disadvantage" else "Investigate / maintain parity"})
     return pd.DataFrame(rows)
 
 def workflow_benchmark(lo,hi,tax,weights=None):
@@ -206,13 +211,16 @@ def workflow_benchmark(lo,hi,tax,weights=None):
         b=bounds(lo,hi,ids,weights)
         for p in lo.index:
             rows.append({"Product ID":p,"Stage":stage,"Lower":b.loc[p,"Lower"],"Upper":b.loc[p,"Upper"],
+                         "Delta vs AIT-VISTA lower":float(b.loc[p,"Lower"]-b.loc[VISTA,"Upper"]) if p!=VISTA else 0.,
+                         "Delta vs AIT-VISTA upper":float(b.loc[p,"Upper"]-b.loc[VISTA,"Lower"]) if p!=VISTA else 0.,
+                         "All mapped criteria lower":float(lo.loc[p,ids].min()),"All mapped criteria upper":float(hi.loc[p,ids].min()),
                          "Determinate weight":b.loc[p,"Determinate weight"],"Criterion IDs":"; ".join(ids)})
-    d=pd.DataFrame(rows,columns=["Product ID","Stage","Lower","Upper","Determinate weight","Criterion IDs"])
+    d=pd.DataFrame(rows,columns=["Product ID","Stage","Lower","Upper","Delta vs AIT-VISTA lower","Delta vs AIT-VISTA upper","All mapped criteria lower","All mapped criteria upper","Determinate weight","Criterion IDs"])
     bottlenecks=[]
     for p,g in d.groupby("Product ID",sort=False):
         bottlenecks.append({"Product ID":p,"Weakest stage lower":g.Lower.min(),"Weakest stage upper":g.Upper.min(),
-                            "Stages mapped":len(g),"All-stage integration":"Not established by criterion assessments"})
-    return d,pd.DataFrame(bottlenecks,columns=["Product ID","Weakest stage lower","Weakest stage upper","Stages mapped","All-stage integration"])
+                            "Stages mapped":len(g),"All mapped criteria lower":g["All mapped criteria lower"].min(),"All mapped criteria upper":g["All mapped criteria upper"].min(),"All-stage integration":"Not established by criterion assessments"})
+    return d,pd.DataFrame(bottlenecks,columns=["Product ID","Weakest stage lower","Weakest stage upper","Stages mapped","All mapped criteria lower","All mapped criteria upper","All-stage integration"])
 
 def sensitivity_analysis(data,mat,cfg,mode,weights,draws=40,seed=42):
     """Weight and evidence scenarios; rank bounds use interval dominance, not random truth.

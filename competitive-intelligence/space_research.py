@@ -38,6 +38,7 @@ def relevance(product,company,deps,observations):
     return "Product space relevance not established",[],[],False
 
 def priority_queue(data,cfg,snapshot_id="",snapshot_date=""):
+    snapshot_id=snapshot_id or digest(data)
     rows=summaries(data);products=registry(data,"Products","Product ID");companies=registry(data,"Companies","Company ID");criteria=registry(data,CRITERIA,"Criterion ID")
     obs=registry(data,"Observations","Observation ID");current=direct_current(data)
     deps=data.get("Deployments",{}).get("rows",[])
@@ -52,7 +53,7 @@ def priority_queue(data,cfg,snapshot_id="",snapshot_date=""):
         existing=[c for q,c in current if q==pid and c in criteria]
         # For P2 do not assume every capability relevant to unrelated products.
         candidates=list(dict.fromkeys([c for c in CORE_IDS+SECONDARY if c in criteria]+existing)) if space or strategic else existing
-        base={"Priority tier":tier,"Company ID":cid,"Company":r.Company,"Product ID":pid,"Product":r.Product,"Space relevance type":kind,"Recorded overlap":r["Recorded overlap fraction"],"Evidence coverage":r["Core evidence coverage"],"Snapshot ID":snapshot_id or digest(data),"Snapshot date":snapshot_date}
+        base={"Priority tier":tier,"Company ID":cid,"Company":r.Company,"Product ID":pid,"Product":r.Product,"Space relevance type":kind,"Recorded overlap":r["Recorded overlap fraction"],"Evidence coverage":r["Core evidence coverage"],"Snapshot ID":snapshot_id,"Snapshot date":snapshot_date}
         for c in candidates:
             e=current.get((pid,c),{});s=e.get("status","Unassessed");grade=e.get("evidence","");records=e.get("rows",[])
             if s=="Not applicable":continue

@@ -99,7 +99,7 @@ def render_map(st,data,rows,key,compact=False):
                 select_product(st,d[(d.X==cell[0])&(d.Y==cell[1])],key+"-cell-product-"+str(cell),"Product in shared category")
         with st.expander("Exact scores and evidence coverage"):
             table(st,d[["Company","Product","Recorded overlap fraction","Core evidence coverage","Core determinate coverage","Customer position"]].assign(**{c:d[c].map(lambda v:f"{v:.2%}") for c in ["Recorded overlap fraction","Core evidence coverage","Core determinate coverage"]}),key+"-score")
-    st.caption("Score = (full + 0.5 × partial) / 8. Recorded evidence coverage = active pairs / 8; determinate coverage = full, partial or explicitly unsupported / 8. 0% is not proof of non-support. Shading marks eligibility, not risk; vertical offsets are display-only. Shared procurement is unresolved.")
+    st.caption("Core company labels are shown by default; use Show all company labels or the exact product selector for dense points. Score = (full + 0.5 × partial) / 8. Recorded evidence coverage = active pairs / 8; determinate coverage = full, partial or explicitly unsupported / 8. 0% is not proof of non-support. Shading marks eligibility, not risk; vertical offsets are display-only. Shared procurement is unresolved.")
 
 def open_profile(st,pid,cid,key):
     st.button("Open profile",key="open-"+key,on_click=navigate,args=(st,pid,cid))

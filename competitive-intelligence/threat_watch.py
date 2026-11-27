@@ -52,7 +52,22 @@ def exposure(data,cfg,ids,cids=None):
         else:
             action="Monitor";why="Review bounded non-support and applicability; do not extrapolate to market-wide absence."
         out.append({"Criterion ID":c,"Criterion":value(criteria[c],"Product criterion"),"Short criterion":short_criterion(c,value(criteria[c],"Product criterion")),"AIT-VISTA":profile(cfg,c,"As-Is"),"Overlap":overlap,"Importance":imp,"Action":action,"Next decision":why,"Product ID":p or "","Product":value(products.get(p,{}),"Product Name"),"Verdict":s,"Evidence":e,"Assessment date":value(r,"Assessment date"),"Comparison ID":value(r,"Comparison ID"),"Source":value(r,"Source URLs"),"Unresolved":unresolved})
-    return pd.DataFrame(out)
+    result=pd.DataFrame(out)
+    if result.empty:return result
+    ranked=priority_records(exposure_records(data,cfg,ids,cids))
+    if ranked.empty:return result
+    for i,r in result.iterrows():
+        g=ranked[ranked["Criterion ID"]==r["Criterion ID"]]
+        # A stronger partial claim with high customer importance must not
+        # disappear behind a weak full claim. Preserve existing unresolved
+        # summary when there is no positive or explicit negative record.
+        actionable=g[g.Verdict.isin(["Supported","Partially supported","Explicitly unsupported"])]
+        if not actionable.empty:
+            best=actionable.iloc[0]
+            if best.Action=="React":
+                for k in ["Overlap","Action","Next decision","Product ID","Product","Verdict","Evidence","Assessment date","Comparison ID","Source"]:
+                    result.loc[i,k]=best[k]
+    return result
 
 def threat_cohort(data,rows):
     """Role-balanced selection; no named competitors or implicit portfolio merge."""

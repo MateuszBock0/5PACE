@@ -50,15 +50,22 @@ def render_map(st,data,rows,key,compact=False):
     d=spread_points(d,reference=(3,2))
     fig=go.Figure()
     fig.add_trace(go.Scatter(x=[3],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="top center",name="AIT-VISTA reference",customdata=[[VISTA]],marker={"symbol":"circle","size":36,"color":"rgba(8,126,123,.18)","line":{"color":"#087e7b","width":2}},hovertemplate="Declared scope / target; not market share<extra></extra>"))
-    rivals=px.scatter(d,x="Display X",y="Display Y",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data={"Display X":False,"Display Y":False,"Functional overlap":True,"Customer position":True,"Customer basis":True,"Procurement":True})
-    for tr in rivals.data:
-        tr.update(marker={"size":12,"line":{"color":"#fff","width":1.5}})
-        fig.add_trace(tr)
+    if not d.empty:
+        rivals=px.scatter(d,x="Display X",y="Display Y",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data={"Display X":False,"Display Y":False,"Functional overlap":True,"Customer position":True,"Customer basis":True,"Procurement":True})
+        for tr in rivals.data:
+            tr.update(marker={"size":12,"line":{"color":"#fff","width":1.5}})
+            fig.add_trace(tr)
     fig.add_hrect(y0=-.45,y1=.45,fillcolor="#e9eef2",line_width=0,layer="below")
     fig.update_layout(height=340 if compact else 465,legend={"orientation":"h","y":-0.27,"font":{"size":10}},xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Some","Material","Broad"],"range":[-.5,3.5],"title":"Recorded functional overlap","automargin":True},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Adjacent sector","Space AIT target","Space AIT case"],"range":[-.5,3.5],"title":"Customer evidence","automargin":True},margin={"t":12,"b":95,"l":15,"r":15})
     st.plotly_chart(fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"product"),selection_mode="points")
     if len(d)>0:
         st.caption("Dense points: use the product selector below the chart as an exact-ID fallback; zoom to inspect nearby points.")
+        dense=d.groupby(["X","Y"]).size()
+        if (dense>1).any():
+            with st.expander("Inspect co-located products by category"):
+                cells=[(x,y) for (x,y),n in dense.items() if n>1]
+                cell=st.selectbox("Shared category",cells,format_func=lambda v:FUNCTION_LANES[int(v[0])]+" / "+CUSTOMER_LANES[int(v[1])],key=key+"-cell")
+                select_product(st,d[(d.X==cell[0])&(d.Y==cell[1])],key+"-cell-product-"+str(cell),"Product in shared category")
     st.caption("Select a product to open its profile. Customer-segment evidence is independent of functional overlap; shared procurement remains unresolved. Positions are categories, not scores or market share. Display-only offsets separate co-located products; full names and categories appear on hover. Marker size is visual emphasis.")
 
 def open_profile(st,pid,cid,key):
@@ -273,19 +280,28 @@ def positioning(st,data,cfg,rows):
     st.caption("Which products address similar AIT workflows and have credible space-market relevance?")
     if rows.empty:return
     f=priority_families(rows)
-    candidates=strategic_map_cohort(rows)
-    default=candidates["Product ID"].tolist()
+    scope=st.selectbox("Market map scope",MAP_SCOPES+["Custom selection"],key="market-map-scope")
+    candidates=strategic_map_cohort(rows,scope)
     names=rows.set_index("Product ID").Product.to_dict()
-    ids=st.multiselect("Products on strategic map",list(names),default=default,format_func=names.get,key="founder-map-products")
+    default=strategic_map_cohort(rows)["Product ID"].tolist()
+    if scope=="Custom selection":
+        ids=st.multiselect("Products on strategic map",list(names),default=default,format_func=names.get,key="market-custom-products")
+    else:ids=candidates["Product ID"].tolist()
+    st.session_state["founder-map-products"]=ids
     d=rows[rows["Product ID"].isin(ids)].copy()
-    if d.empty:st.info("Select products to compare.");return
     render_map(st,data,d,"founder-map")
+    st.caption(f"{len(d)} of {len(rows)} product records shown. Hidden products are not assessed as low threat.")
+    if d.empty:return
     select_product(st,d,"map")
+    with st.expander("Map exclusions"):
+        excluded=map_exclusions(rows,d,scope)
+        if excluded.empty:st.caption("All products included.")
+        else:table(st,excluded[["Company","Product","Role","Reason not shown"]],"market-map-exclusions")
     st.subheader("AIT workflow coverage")
     criteria=registry(data,CRITERIA,"Criterion ID")
     stages={c:label for label,c in WORKFLOW_EXAMPLES if c in criteria}
     if stages:
-        workflow_ids=st.multiselect("Workflow products",ids,default=ids[:6],format_func=names.get,key="workflow-products")
+        workflow_ids=st.multiselect("Workflow products",ids,default=ids[:6],format_func=names.get,key="workflow-products-"+str(scope))
         heatmap(st,data,cfg,d[d["Product ID"].isin(workflow_ids)],"workflow",list(stages),stage_labels=stages)
         st.caption("Selected criterion examples by workflow stage, not proof of complete or integrated stage coverage.")
     else:

@@ -62,3 +62,14 @@ def test_headlines_include_partial_and_provenance_gates_react():
     e=exposure_records(d,{},["DEMO-P1","DEMO-P2"],["CR1"])
     assert set(headline_records(e).Verdict)=={"Supported","Partially supported"}
     assert not (e.Action=="React").any()
+
+def test_strong_partial_react_not_hidden_by_weak_full():
+    from threat_watch import exposure,exposure_records
+    d=comparison_fixture()
+    d["Comparison Assessment"]["rows"][0]["Evidence level"]="Vendor claim"
+    d["Comparison Assessment"]["rows"][1]["Verdict"]="Partially supported"
+    d["Comparison Assessment"]["rows"][1]["Evidence level"]="Official technical documentation"
+    cfg={"command_profiles":{"CR1":{"customer_importance":"High","customer_importance_reference":"customer-interview-reference"}}}
+    records=exposure_records(d,cfg,["DEMO-P1","DEMO-P2"],["CR1"])
+    assert records[records["Product ID"]=="DEMO-P2"].iloc[0].Action=="React"
+    assert exposure(d,cfg,["DEMO-P1","DEMO-P2"],["CR1"]).iloc[0]["Product ID"]=="DEMO-P2"

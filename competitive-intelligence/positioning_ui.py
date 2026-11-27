@@ -1,5 +1,6 @@
 """Offline market positioning UI. All views use the direct ledger and owner baseline."""
 import pandas as pd
+from excel_archive import download_analysis
 import plotly.express as px
 import plotly.graph_objects as go
 from core import value
@@ -11,7 +12,9 @@ from positioning import (VISTA,ALL,DIMENSIONS,COMMERCIAL,WORKFLOWS,EVIDENCE_MODE
 
 def table(st,d,key):
     st.dataframe(d,use_container_width=True,hide_index=True)
-    if not d.empty: st.download_button("Export CSV",d.to_csv(index=False).encode("utf-8"),file_name=key+".csv",key="pos-"+key)
+    if not d.empty:
+        st.download_button("Export CSV",d.to_csv(index=False).encode("utf-8"),file_name=key+".csv",key="pos-"+key)
+        download_analysis(st,d,"pos-"+key,key)
 
 def interval_chart(st,d,lower,upper,label,title):
     if d.empty: return

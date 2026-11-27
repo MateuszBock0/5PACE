@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1-rc1 — Excel Archive & Data Export
+
+- Automatic values-only XLSX archiving following validated SQLite sync, monthly history and latest copy.
+- Offline archive reconstruction, historical snapshot download and local folder access.
+- XLSX alternatives to analytical CSV exports and full snapshot export.
+- Atomic file replacement, literal untrusted strings, separate export failure handling, ignored local archive.
+
 ## 1.3.0-rc1 — Market Positioning Intelligence
 
 - Dedicated Market Positioning workspace: shared-axis map including AIT-VISTA, dimension radar bounds, competitive proximity, company portfolios, advantage portfolio, evidence and weight sensitivity, workflow-stage benchmarking.

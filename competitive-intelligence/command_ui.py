@@ -1,5 +1,6 @@
 """Executive command centre; existing analytical workspaces remain available."""
 import pandas as pd
+from excel_archive import download_analysis
 import plotly.express as px
 import plotly.graph_objects as go
 from core import value, connect, read_snapshot
@@ -15,6 +16,7 @@ def table(st,df,key):
     st.dataframe(df,use_container_width=True,hide_index=True)
     if not df.empty:
         st.download_button("Export CSV",df.to_csv(index=False).encode("utf-8"),file_name=key+".csv",key="cmd-"+key)
+        download_analysis(st,df,"cmd-"+key,key)
 
 def intervals(st,df,lower,upper,label,axis):
     d=df.dropna(subset=[lower,upper]).iloc[::-1]
@@ -266,4 +268,5 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         if not q.empty:
             st.dataframe(q.head(300),use_container_width=True,hide_index=True)
             st.download_button("Export complete research queue CSV",q.to_csv(index=False).encode("utf-8"),file_name="priority-research.csv",key="cmd-priority-research")
+            download_analysis(st,q,"cmd-priority-research","priority-research")
         else: st.info("No selected research questions.")

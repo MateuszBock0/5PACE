@@ -1,0 +1,23 @@
+name: CIE public offline runtime
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: |
+          mkdir -p runtime/wheels
+          python -m pip download --only-binary=:all: --no-deps -d runtime/wheels 'streamlit==1.51.0' altair blinker gitpython gitdb smmap pyarrow tenacity toml watchdog google-auth google-auth-oauthlib requests-oauthlib pyasn1 pyasn1-modules rsa
+          cp -r competitive-intelligence runtime/source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cie-public-code-runtime
+          path: runtime/
+          include-hidden-files: true
+          retention-days: 3

@@ -56,13 +56,28 @@ def sample():
     if errors:raise RuntimeError(str(errors))
     return d
 
-def capture(out):
+def capture(out,live=False):
     out.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cie-ux-") as temp:
         work=Path(temp)/"app"
         shutil.copytree(ROOT,work,ignore=shutil.ignore_patterns("data","credentials","config.local.json","reports",".venv","__pycache__",".pytest_cache","screenshots"))
-        with connect(work/"data"/"intelligence.db") as conn:store(conn,sample(),source="Synthetic UX fixture",mark_synced=False)
-        env={**os.environ,"CIE_VISUAL_PREVIEW":"1"}
+        if live:
+            import sqlite3,json
+            from contextlib import closing
+            from core import DB,config,read_snapshot,state,history,validate
+            if not DB.is_file():raise RuntimeError("No local SQLite snapshot; synchronise first.")
+            (work/"data").mkdir(exist_ok=True)
+            with closing(sqlite3.connect(DB.as_uri()+"?mode=ro",uri=True)) as a,closing(sqlite3.connect(work/"data"/"intelligence.db")) as b:a.backup(b)
+            with connect(work/"data"/"intelligence.db") as conn:
+                data=read_snapshot(conn);h=state(conn,"current_hash");snap=next((s for s in history(conn) if s[0]==h),None)
+                if not data or not snap or str(snap[2]).lower().startswith("synthetic"):raise RuntimeError("Actual local snapshot required")
+                errors,_=validate(data)
+                if errors:raise RuntimeError("Local validation failed")
+            cfg=config()
+            (work/"config.local.json").write_text(json.dumps({k:cfg[k] for k in ("command_profiles","positioning_dimensions","positioning_workflows","positioning_vista_commercial") if k in cfg}),encoding="utf-8")
+        else:
+            with connect(work/"data"/"intelligence.db") as conn:store(conn,sample(),source="Synthetic UX fixture",mark_synced=False)
+        env=dict(os.environ)
         log=out/"streamlit.log"
         with log.open("w",encoding="utf-8") as f:
             p=subprocess.Popen([sys.executable,"-m","streamlit","run","app.py","--server.headless=true","--server.port=8765"],cwd=work,env=env,stdout=f,stderr=subprocess.STDOUT)
@@ -96,12 +111,51 @@ def capture(out):
                         page.wait_for_timeout(400)
                     def nav(name):
                         page.get_by_test_id("stSidebar").get_by_text(name,exact=True).click()
-                        ready(name)
+                        ready("Competitive Command Centre" if name=="Command Centre" else name)
                         top()
                     ready("Competitive Command Centre")
                     shot("01_Command_Centre")
-                    page.get_by_role("button",name="Open profile",exact=True).first.click()
-                    ready("Competitor Explorer")
+                    def map_point(pid,criterion=None,plot_index=0):
+                        plot=page.locator(".js-plotly-plot").nth(plot_index)
+                        plot.scroll_into_view_if_needed()
+                        xy=plot.evaluate("""(gd,args)=>{for(let ti=0;ti<gd.data.length;ti++){const tr=gd.data[ti];for(let i=0;i<(tr.customdata||[]).length;i++){
+                          const d=tr.customdata[i];if(d[0]===args[0] && (args[1]===null||d[1]===args[1])){
+                            const pt=(gd.calcdata[ti]||[]).find(p=>p.i===i)||(gd.calcdata[ti]||[])[i];
+                            if(!pt)return null;
+                            const r=gd.getBoundingClientRect(),x=gd._fullLayout.xaxis,y=gd._fullLayout.yaxis;
+                            const xy=[r.x+x._offset+x.l2p(pt.x),r.y+y._offset+y.l2p(pt.y)];
+                            return xy.every(Number.isFinite)?xy:null;
+                          }}}return null;}""",[pid,criterion])
+                        if xy is None:raise RuntimeError("Requested chart point not present: "+pid)
+                        page.mouse.click(*xy)
+                    if live:
+                        from command_engine import registry
+                        from founder import summaries
+                        rows=summaries(data)
+                        for name in ["Connektica","Rapta","Dheera","iLEAN"]:
+                            r=rows[rows.Company.str.casefold()==name.casefold()]
+                            if r.empty:raise RuntimeError("Acceptance company not found: "+name)
+                            nav("Market Positioning")
+                            # Use the displayed default map when possible; otherwise use
+                            # the searchable profile directory (recorded as a limitation).
+                            pid=r.iloc[0]["Product ID"]
+                            plot=page.locator(".js-plotly-plot").first
+                            present=plot.evaluate("(gd,p)=>gd.data.some(t=>(t.customdata||[]).some(d=>d[0]===p))",pid)
+                            if present:
+                                map_point(pid)
+                                ready("Competitor Explorer")
+                            else:
+                                nav("Competitor Explorer")
+                                search=page.get_by_placeholder("Search companies, products or technologies")
+                                if not search.count():search=page.get_by_role("textbox").first
+                                search.fill(name);search.press("Enter");page.wait_for_timeout(600)
+                            page.get_by_role("heading",name=name,exact=True).wait_for(timeout=15000)
+                            top();shot("Profile_"+name)
+                        nav("Competitor Explorer")
+                    else:
+                        map_point("DEMO-P1")
+                        ready("Competitor Explorer")
+                        page.get_by_role("heading",name="Example Robotics",exact=True).wait_for(timeout=10000)
                     top()
                     shot("02_Competitor_Explorer")
                     page.get_by_text("Compare",exact=True).click()
@@ -115,6 +169,11 @@ def capture(out):
                     shot("05_AIT_Workflow")
                     nav("Competitive Advantage")
                     shot("06_Competitive_Advantage")
+                    if not live:
+                        map_point("DEMO-P1","AV-CR-003")
+                        ready("Competitor Explorer")
+                        page.get_by_text("Physical configuration verification — Supported",exact=True).wait_for(timeout=15000)
+                        nav("Competitive Advantage")
                     section("Differentiation portfolio")
                     shot("07_Advantage_Portfolio")
                     nav("Intelligence Monitor")
@@ -126,6 +185,11 @@ def capture(out):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.1 Streamlit app.\nAll displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n",encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.2 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    if live:
+        from zipfile import ZipFile,ZIP_DEFLATED
+        with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:
+            for path in sorted(out.glob("*.png")):z.write(path,path.name)
+            z.write(out/"README.txt","README.txt")
 
-if __name__=="__main__":capture(Path(sys.argv[1] if len(sys.argv)>1 else "screenshots").resolve())
+if __name__=="__main__":capture(Path(sys.argv[1] if len(sys.argv)>1 else "screenshots").resolve(),live="--live" in sys.argv[2:])

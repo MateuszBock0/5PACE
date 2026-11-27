@@ -1,6 +1,6 @@
 # Competitive Intelligence Engine
 
-Version 1.4.1-rc1 — visual refinement of founder-oriented command centre.
+Version 1.4.2-rc1 — strategic decisions and real-data acceptance.
 
 ## First-time installation and authentication
 
@@ -153,3 +153,8 @@ The strategic heatmap uses selectable coloured square cells and explicit evidenc
 
 ## Visual refinement v1.4.1
 The uploaded UX brief guides a light teal interface, three summary cards and two-column landing page, alias search, profile overview cards with section navigation, qualitative relationship lanes (not quantified buyer overlap), labelled distinct heatmap states and fixed workflow criterion examples. Advanced Analytics retains full interval methods. The screenshot workflow uses only fictitious test data, never Google Sheets or operational SQLite. Customer importance remains optional and unknown if absent.
+
+## v1.4.2 decision UX
+The landing and Market Positioning use a shared functional-overlap × customer-segment-evidence map with direct profile navigation. Customer axis uses recorded target statements and qualifying implementation records independently of technological overlap; shared procurement remains unresolved. Profiles include company portfolio, commercial context and decision consequences. Heatmap selections route to exact product and criterion; monitor signals route to source records. A portfolio plot shows functional findings even if customer importance is unresolved; only explicit provenance-bearing importance is placed on the value axis. The mode banner reflects stored snapshot source and historical pointer, not an environment flag. No source writes or new databases.
+
+Run `ACCEPTANCE_WINDOWS.bat` for private offline AppTest acceptance of the four profiles, seven sections and six navigation entries against a temporary SQLite backup; report `competitive-intelligence/reports/live-acceptance.json`. To render actual private browser screenshots, run `CAPTURE_LIVE_WINDOWS.bat` (optional Playwright/Chromium installation needs network the first time); ZIP in `competitive-intelligence/reports/5PACE_live_screenshots.zip`. Do not upload private captures to GitHub. Native-browser click verification is distinct from AppTest.

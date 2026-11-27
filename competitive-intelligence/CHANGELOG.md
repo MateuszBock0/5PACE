@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2-rc1 — Strategic decision UX
+
+- Independent customer-segment evidence categories and direct map-to-profile navigation.
+- Landing recommendations, company portfolio brief, evidence-linked signals, grouped comparisons and visual functional portfolio.
+- Snapshot-provenance mode indicator and private real-data acceptance workflow.
+
 ## 1.4.1-rc1 — UX brief refinement
 
 - Compact founder landing, light teal theme, company alias search, profile cards and seven profile sections.

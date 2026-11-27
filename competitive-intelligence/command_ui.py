@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from core import value, connect, read_snapshot
 from competitive_roles import classify, family_watchlist
 from advanced_ui import save_settings
+from positioning_ui import positioning_page
 from analytics import matrix, DISPLAY
 from product_intelligence import criterion_matrix, CRITERIA, mappings
 from command_engine import (ASSESS, VIEW, registry, direct_matrix, direct_current, matrix_audit,
@@ -45,9 +46,12 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
     ids=[p for p in products if classifications[p]["Analytical role"] in selected_roles]
     if mode=="As-Is": st.caption("AIT-VISTA listed criteria are treated as implemented, as declared by the product owner. Competitor evidence uncertainty remains explicit.")
     else: st.info("Target/MVP are optional planning scenarios; As-Is is the default product baseline.")
-    view=st.radio("Command workspace",["Executive dashboard","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"],horizontal=True,key="cmd-view")
+    view=st.radio("Command workspace",["Executive dashboard","Market Positioning","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"],horizontal=True,key="cmd-view")
     allmat=direct_matrix(data,ids)
     weights={c:cfg.get("command_profiles",{}).get(c,{}).get("importance",3) for c in criteria}
+    if view=="Market Positioning":
+        positioning_page(st,data,cfg,allmat,weights,mode,demo_mode)
+        return
     scope=scope_ids(data,cfg,mode)
     mat=allmat[scope]
     if not ids: st.warning("Select at least one competitor role.")
@@ -197,7 +201,7 @@ def command_page(st,data,cfg,demo_mode,snapshots,current):
         if submit:
             if demand=="Validated" and not dref.strip(): st.error("Validated customer demand requires a reference; this is separate from functionality.")
             else:
-                allp=dict(cfg.get("command_profiles",{}));allp[cid]={"stage":stage,"status":status,"reference":ref.strip(),"mvp":mvp,"target":target,"demand":demand,"demand_reference":dref.strip(),"importance":importance,"effort":effort,"strategic_value":strategic,"route":route,"tradeoff":trade}
+                allp=dict(cfg.get("command_profiles",{}));allp[cid]={**r,"stage":stage,"status":status,"reference":ref.strip(),"mvp":mvp,"target":target,"demand":demand,"demand_reference":dref.strip(),"importance":importance,"effort":effort,"strategic_value":strategic,"route":route,"tradeoff":trade}
                 save_settings({"command_profiles":allp});st.rerun()
         rows=[]
         for c in criteria:

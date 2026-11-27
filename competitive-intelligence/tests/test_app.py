@@ -36,8 +36,26 @@ def test_command_workspaces(monkeypatch,tmp_path):
     monkeypatch.setattr(core,"connect",lambda:original(db))
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=40).run()
     assert not app.exception
-    for view in ["Executive dashboard","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"]:
+    for view in ["Executive dashboard","Market Positioning","Benchmark & competitor profile","Product baseline & priorities","Watchlist & evolution","Research queue"]:
         next(r for r in app.radio if r.label=="Command workspace").set_value(view).run()
         assert not app.exception, f"{view}: {app.exception}"
     next(r for r in app.radio if r.label=="AIT-VISTA comparison baseline").set_value("As-Is").run()
+    assert not app.exception
+
+def test_positioning_workspaces(monkeypatch,tmp_path):
+    from test_command import comparison_fixture
+    original=core.connect
+    db=tmp_path/"position.db"
+    with original(db) as conn: core.store(conn,comparison_fixture())
+    monkeypatch.setattr(core,"connect",lambda:original(db))
+    app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=45).run()
+    next(r for r in app.radio if r.label=="Command workspace").set_value("Market Positioning").run()
+    assert not app.exception
+    for view in ["Positioning map","Capability profile","Competitive proximity","Company portfolios","Advantage portfolio","Evidence sensitivity","Workflow differentiation","Methodology & settings"]:
+        next(r for r in app.radio if r.label=="Positioning workspace").set_value(view).run()
+        assert not app.exception, f"{view}: {app.exception}"
+    next(r for r in app.radio if r.label=="Positioning workspace").set_value("Positioning map").run()
+    next(s for s in app.selectbox if s.label=="Y axis").set_value("Commercial readiness").run()
+    assert not app.exception
+    next(r for r in app.radio if r.label=="AIT-VISTA comparison baseline").set_value("MVP").run()
     assert not app.exception

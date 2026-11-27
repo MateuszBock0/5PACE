@@ -55,6 +55,11 @@ def positioning_page(st,data,cfg,mat,weights,mode,demo_mode):
         fig=px.scatter(others,x="X lower",y="Y lower",color="Role",hover_name="Product",custom_data=["Product ID"],hover_data=["Company","X upper","Y upper"],error_x="X width",error_x_minus="Zero",error_y="Y width",error_y_minus="Zero")
         own=d[d["Product ID"]==VISTA].iloc[0]
         fig.add_trace(go.Scatter(x=[own["X lower"]],y=[own["Y lower"]],name=own.Product,mode="markers+text",text=[own.Product],textposition="bottom left",customdata=[[VISTA]],marker={"symbol":"star","size":20,"color":"#22b987"},error_x={"type":"data","symmetric":False,"array":[own["X width"]],"arrayminus":[0]},error_y={"type":"data","symmetric":False,"array":[own["Y width"]],"arrayminus":[0]},hovertemplate="AIT-VISTA reference<br>X lower %{x:.0%}<br>Y lower %{y:.0%}<extra></extra>"))
+        fig.data[-1].marker.size=36
+        fig.data[-1].marker.color="rgba(8,126,123,.3)"
+        fig.data[-1].marker.line={"color":"#087e7b","width":2}
+        fig.data=(fig.data[-1],)+fig.data[:-1]
+        for tr in fig.data[1:]:tr.update(marker={"size":12,"line":{"color":"white","width":1}})
         fig.update_layout(xaxis={"range":[-.03,1.08],"tickformat":".0%","title":x},yaxis={"range":[-.03,1.08],"tickformat":".0%","title":y},height=580)
         event=st.plotly_chart(fig,use_container_width=True,on_select="rerun",selection_mode="points",key="pos-map")
         if own["X width"]>=.999 or own["Y width"]>=.999: st.info("AIT-VISTA has an unresolved axis. The star marks the lower interval endpoint, not a measured position.")

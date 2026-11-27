@@ -3,13 +3,15 @@ from core import value,digest
 from founder import summaries,strategic_map_cohort
 from decision import dataset_label
 from pdf_reports import REPORTS,MIME,render_report
+from threat_watch import report_provenance
 
 def export_panel(st,data,cfg,snapshots,current,head,demo,primary,location="sidebar"):
     if data is None:return
     source=next((s[2] for s in snapshots if s[0]==current),"")
     stamp=next((s[1] for s in snapshots if s[0]==current),"")
     mode=dataset_label(data,source,current,head,demo)
-    h=digest(data)
+    stamp,h,source=report_provenance(data,mode,stamp,digest(data),source)
+    if demo:stamp="Not applicable (synthetic)"
     k="pdf-"+location
     container=st.sidebar.expander("Export reports (PDF)") if location=="sidebar" else st.container(border=True)
     with container:
@@ -32,7 +34,7 @@ def export_panel(st,data,cfg,snapshots,current,head,demo,primary,location="sideb
             ids=[i for i in ids if i in names]
         else:ids=strategic_map_cohort(r)["Product ID"].tolist() if names else []
         st.caption(f"{len(ids)} products · {mode}. PDF uses this snapshot and explicit scope, not live data. QA checks the entire snapshot.")
-        signature=(h,mode,kind,tuple(ids),repr(cfg.get("command_profiles",{})))
+        signature=(h,mode,stamp,source,kind,tuple(ids),repr(cfg.get("command_profiles",{})))
         if st.button("Generate PDF",key=k+"-generate",disabled=(not ids and kind!="QA & data integrity")):
             try:
                 payload=render_report(data,cfg,kind,ids,mode,stamp,h,source)

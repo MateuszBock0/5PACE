@@ -115,6 +115,12 @@ def capture(out,live=False):
                         top()
                     ready("Competitive Command Centre")
                     shot("01_Command_Centre")
+                    for width,height in [(1280,800),(1920,1080)]:
+                        page.set_viewport_size({"width":width,"height":height});page.wait_for_timeout(500)
+                        top();shot("Landing_"+str(width)+"x"+str(height))
+                    page.set_viewport_size({"width":1600,"height":1080});page.wait_for_timeout(500)
+                    section("Threat Watch");shot("09_Threat_Watch")
+                    top()
                     def map_point(pid,criterion=None,plot_index=0):
                         plot=page.locator(".js-plotly-plot").nth(plot_index)
                         plot.scroll_into_view_if_needed()
@@ -132,8 +138,8 @@ def capture(out,live=False):
                         from command_engine import registry
                         from founder import summaries
                         rows=summaries(data)
-                        for name in ["Connektica","Rapta","Dheera","iLEAN"]:
-                            r=rows[rows.Company.str.casefold()==name.casefold()]
+                        for name in ["Connektica","Rapta","Dheera","iLEAN","AI4AIT"]:
+                            r=rows[rows.Company.str.casefold().str.startswith("ai4ait")] if name=="AI4AIT" else rows[rows.Company.str.casefold()==name.casefold()]
                             if r.empty:raise RuntimeError("Acceptance company not found: "+name)
                             nav("Market Positioning")
                             # Use the displayed default map when possible; otherwise use
@@ -149,7 +155,7 @@ def capture(out,live=False):
                                 search=page.get_by_placeholder("Search companies, products or technologies")
                                 if not search.count():search=page.get_by_role("textbox").first
                                 search.fill(name);search.press("Enter");page.wait_for_timeout(600)
-                            page.get_by_role("heading",name=name,exact=True).wait_for(timeout=15000)
+                            page.get_by_role("heading",name=r.iloc[0].Company,exact=True).wait_for(timeout=15000)
                             top();shot("Profile_"+name)
                         nav("Competitor Explorer")
                     else:
@@ -185,7 +191,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.2 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.4 Streamlit app.\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

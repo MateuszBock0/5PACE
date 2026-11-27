@@ -41,8 +41,8 @@ def run():
             companies=registry(data,"Companies","Company ID")
             report={"Snapshot hash":h,"Capture UTC":snap[1],"Source":snap[2],"Mode":mode,
                     "Validation errors":errors,"Validation warnings":warnings,"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
-            for name in ["Connektica","Rapta","Dheera","iLEAN"]:
-                ids=[c for c in search_companies(data,name) if core.value(companies[c],"Company Name").casefold()==name.casefold()]
+            for name in ["Connektica","Rapta","Dheera","iLEAN","AI4AIT"]:
+                ids=[c for c in search_companies(data,name) if core.value(companies[c],"Company Name").casefold()==name.casefold() or (name=="AI4AIT" and core.value(companies[c],"Company Name").casefold().startswith("ai4ait"))]
                 if len(ids)!=1:raise RuntimeError("Profile missing or ambiguous: "+name)
                 cid=ids[0];r=rows[rows["Company ID"]==cid].iloc[0];pid=r["Product ID"]
                 # The same callback contract used by real map selections.
@@ -60,6 +60,16 @@ def run():
                 report["Profiles"].append({"Company":name,"Product":core.value(products[pid],"Product Name"),"Sections":"7/7","Customer position":r["Customer position"],"Procurement":r["Procurement"],"Direct active pairs":sum(p==pid for p,c in direct_current(data))})
             for view in ["Command Centre","Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Advanced Analytics"]:
                 app.sidebar.radio[0].set_value(view).run();check(view);report["Workspaces"].append(view)
+            from pdf_reports import REPORTS,render_report
+            from threat_watch import report_provenance
+            report["PDF reports"]=[]
+            for kind in REPORTS:
+                payload=render_report(data,core.config(),kind,mode=mode,captured=snap[1],snapshot_hash=h,source=snap[2])
+                assert payload.startswith(b"%PDF-") and b"%%EOF" in payload[-100:]
+                file=out.parent/("acceptance_"+kind.replace(" ","_").replace("&","and")+".pdf")
+                file.write_bytes(payload)
+                report["PDF reports"].append({"Report":kind,"Bytes":len(payload),"File":file.name})
+            report["PDF visual QA"]="Not covered by PDF signature tests; inspect rendered pages."
             assert core.digest(data)==h
             with original(path) as conn:assert core.state(conn,"current_hash")==h
             report["Status"]="PASS: actual-snapshot AppTest and callback contracts; native browser and local sync separate."

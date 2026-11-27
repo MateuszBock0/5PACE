@@ -26,7 +26,7 @@ from advanced_ui import (commercial_page, product_page, strategic_page, evolutio
 
 st.set_page_config(page_title="5PACE | Competitive Intelligence", layout="wide")
 st.markdown("**5PACE / INTELLIGENCE**")
-st.caption("v1.4.3-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
+st.caption("v1.4.4-rc1 · Offline-first competitive intelligence · Evidence-aware analytics · Read-only Google Sheets")
 cfg=config()
 with connect() as conn:
     data=read_snapshot(conn)
@@ -49,8 +49,9 @@ elif current!=head:
 source=next((s[2] for s in snapshots if s[0]==current),"")
 st.caption("DATA MODE: "+dataset_label(data,source,current,head,demo_mode)+" · "+(next((s[1] for s in snapshots if s[0]==current),"No capture") if not demo_mode else "Fictitious fixture"))
 st.sidebar.caption("Last successful source sync (UTC)")
-st.sidebar.write(last or "Never")
-st.sidebar.caption("Stale: "+("yes" if stale else "no"))
+st.sidebar.write("Not applicable (synthetic)" if demo_mode else last or "Never")
+st.sidebar.caption("Source check age: "+("not applicable" if demo_mode else "due" if stale else "fresh"))
+st.sidebar.caption("Snapshot capture and source check are distinct; unchanged source content retains its capture time.")
 if st.sidebar.button("Refresh interface"):
     st.rerun()
 if st.sidebar.button("Sync data now",disabled=demo_mode):
@@ -329,7 +330,7 @@ elif page=="Reports":
     gaps=research_gaps(data,mat,cfg.get("priority_capabilities",[]))
     title="5PACE Competitive Intelligence Report"+(" — SYNTHETIC DEMO" if demo_mode else "")
     doc="<html><head><meta charset='utf-8'><title>"+html.escape(title)+"</title><style>body{font:15px system-ui;margin:32px;color:#182439}table{border-collapse:collapse;font-size:12px}td,th{padding:6px;border:1px solid #ccd3db;vertical-align:top}h1,h2{color:#203861}</style></head><body>"
-    doc+="<h1>"+html.escape(title)+"</h1><p>Snapshot: "+html.escape(digest(data))+"</p><p>Source sync (UTC): "+html.escape(last or "Not synchronised")+"</p>"
+    doc+="<h1>"+html.escape(title)+"</h1><p>Snapshot: "+html.escape(digest(data))+"</p><p>Source sync (UTC): "+html.escape("Not applicable (synthetic)" if demo_mode else last or "Not synchronised")+"</p>"
     doc+="<h2>Coverage</h2>"+pd.DataFrame([stats]).to_html(index=False,escape=True)
     doc+="<h2>Current assessments</h2>"+latest[latest["Product ID"].isin(selected_products)&latest["Capability ID"].isin(selected_caps)].to_html(index=False,escape=True)
     doc+="<h2>Top research questions</h2>"+gaps.head(100).to_html(index=False,escape=True)

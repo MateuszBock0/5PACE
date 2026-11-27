@@ -134,7 +134,7 @@ def recorded_market_changes(before,after):
     return pd.DataFrame(rows,columns=["Product ID","Product","Register","Record","Recorded change","Interpretation"])
 
 # These are criterion references from the UX specification, not competitor data.
-BRIEF_CRITERIA=["AV-CR-003","AV-CR-004","AV-CR-002","AV-CR-020","AV-CR-005","AV-CR-008","AV-CR-022"]
+BRIEF_CRITERIA=["AV-CR-003","AV-CR-004","AV-CR-002","AV-CR-005","AV-CR-006","AV-CR-008","AV-CR-020","AV-CR-021","AV-CR-022","AV-CR-026","AV-CR-029","AV-CR-034"]
 WORKFLOW_EXAMPLES=[("Procedure planning","AV-CR-009"),("Physical assembly","AV-CR-003"),("Execution control","AV-CR-004"),("Testing / measurements","AV-CR-015"),("Evidence / reporting","AV-CR-002")]
 def brief_criteria(data):
     c=registry(data,CRITERIA,"Criterion ID")

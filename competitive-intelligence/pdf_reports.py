@@ -3,7 +3,7 @@ from datetime import datetime,timezone
 from io import BytesIO
 from pathlib import Path
 import os, re
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape,quoteattr
 import pandas as pd
 import reportlab
 from reportlab.lib import colors
@@ -19,6 +19,7 @@ from command_engine import registry,direct_matrix,direct_current,matrix_audit,re
 from product_intelligence import CRITERIA
 from founder import summaries,strategic_map_cohort,brief_criteria,profile_records,advantage_summary,profile_findings,WORKFLOW_EXAMPLES
 from decision import signals,CUSTOMER_LANES,FUNCTION_LANES,importance_lane
+from threat_watch import exposure,report_provenance,selected_criteria,spread_points
 
 REPORTS=["Strategic overview","Competitor profile","Market positioning & workflow","Competitive advantage","Intelligence monitor","QA & data integrity","Combined strategic report"]
 MIME="application/pdf"
@@ -43,6 +44,7 @@ def text(v):
 
 def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source=""):
     if kind not in REPORTS:raise ValueError("Unknown report type")
+    captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
     fonts()
     companies=registry(data,"Companies","Company ID");products=registry(data,"Products","Product ID")
     criteria=registry(data,CRITERIA,"Criterion ID");ledger=direct_current(data)
@@ -63,7 +65,15 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         "head":ParagraphStyle("head",fontName=BOLD,fontSize=8,leading=10,textColor=colors.white,splitLongWords=True),
     }
     story=[]
-    def p(v,style="body"):return Paragraph(escape(text(v)).replace("\n","<br/>"),styles[style])
+    def p(v,style="body"):
+        raw=text(v);parts=[];last=0
+        for m in re.finditer(r'https?://[^\s<>]+',raw):
+            parts.append(escape(raw[last:m.start()]))
+            url=m.group(0).rstrip(".,;)")
+            parts.append("<link href="+quoteattr(url)+" color=\"#087E7B\">"+escape(url)+"</link>"+escape(m.group(0)[len(url):]))
+            last=m.end()
+        parts.append(escape(raw[last:]))
+        return Paragraph("".join(parts).replace("\n","<br/>"),styles[style])
     def add(v,style="body"):story.append(p(v,style))
     def heading(v):add(v,"h")
     def table(headers,values,ratios=None,status_cols=()):
@@ -81,29 +91,55 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         heading("Strategic watchlist")
         add("Recorded roles are provisional; actual procurement overlap is unresolved. Research entrants are included independently of commercial ranking.")
         table(["Company / product","Competitive role and decision","Evidence / uncertainty"],[(r.Company+"\n"+r.Product,r.Role+"\n"+r.Decision,r["Why care"]+"\n"+r.Unresolved) for _,r in d.iterrows()],[1.2,1.6,2.5])
+    def threat():
+        heading("Threat Watch and response priorities")
+        e=exposure(data,cfg,ids)
+        if not e.empty:
+            xs=["No positive record / unresolved","Partial recorded","Full recorded"];ys=["Unresolved","Low","Medium","High"]
+            dr=Drawing(width,164);left=75;bottom=27;cw=(width-left-6)/3;ch=30
+            for i,lab in enumerate(ys):
+                dr.add(String(0,bottom+i*ch+12,lab,fontName=FONT,fontSize=8,fillColor=NAVY))
+                for j in range(3):dr.add(Rect(left+j*cw,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
+            for j,lab in enumerate(["Unresolved overlap","Partial support","Full support"]):
+                dr.add(String(left+(j+.5)*cw,10,lab,fontName=FONT,fontSize=8,textAnchor="middle",fillColor=NAVY))
+            for (x,y),g in e.groupby(["Overlap","Importance"]):
+                if x not in xs or y not in ys:continue
+                dr.add(String(left+(xs.index(x)+.5)*cw,bottom+ys.index(y)*ch+12,str(len(g))+" criteria",fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=TEAL))
+            story.append(dr)
+            add("Response map: customer importance by recorded overlap. Counts group criteria in the same category; exact action and evidence are listed below.","small")
+            table(["Criterion / action","Product / verdict","Evidence and next decision"],[(r["Short criterion"]+"\n"+r.Action,r.Product+"\n"+r.Verdict,r.Evidence+" | "+r["Assessment date"]+" | "+r["Comparison ID"]+"\n"+r["Next decision"]+"\n"+r.Source) for _,r in e.iterrows()],[1,1,2.5])
+            add("Importance without provenance is unresolved. Recorded support is not performance or commercial substitution.")
     def market():
         heading("Technology × customer positioning")
         add("Categorical map: recorded functional overlap versus customer-segment evidence. Marker locations within a cell only separate labels. AIT-VISTA is the declared reference, not proven adoption.")
         if not d.empty:
             dr=Drawing(width,245);left=132;bottom=36;cw=(width-left-12)/4;ch=44
-            for i,lab in enumerate(CUSTOMER_LANES):
+            for i,lab in enumerate(["Unresolved","Adjacent sector","Space AIT target","Space AIT case"]):
                 dr.add(String(0,bottom+i*ch+19,lab,fontName=FONT,fontSize=7,fillColor=NAVY))
                 for j in range(4):dr.add(Rect(left+j*cw,bottom+i*ch,cw,ch,strokeColor=colors.white,fillColor=PALE))
             for j,lab in enumerate(["Unresolved","Some","Material","Broad"]):dr.add(String(left+j*cw+cw/2,18,lab,fontName=FONT,fontSize=7,textAnchor="middle",fillColor=NAVY))
-            dr.add(String(left+3*cw+cw*.8,bottom+2*ch+ch*.75,"V",fontName=BOLD,fontSize=10,fillColor=TEAL))
+            rx=left+3.5*cw;ry=bottom+2.5*ch
+            dr.add(Circle(rx,ry,17,fillColor=colors.HexColor("#D9EEEA"),strokeColor=TEAL,strokeWidth=1.2))
+            dr.add(String(rx,ry+19,"AIT-VISTA",fontName=BOLD,fontSize=7,textAnchor="middle",fillColor=TEAL))
             for (x,y),g in d.groupby(["Functional overlap","Customer position"]):
                 if x not in FUNCTION_LANES or y not in CUSTOMER_LANES:continue
                 j=FUNCTION_LANES.index(x);i=CUSTOMER_LANES.index(y)
                 # For dense maps label groups, and supply exact membership below.
                 label=str(len(g))+" products" if len(g)>1 else str(ids.index(g.iloc[0]["Product ID"])+1)
                 xx=left+j*cw+cw/2;yy=bottom+i*ch+ch/2
-                dr.add(Circle(xx,yy,10,fillColor=colors.HexColor("#466D8A"),strokeColor=None))
+                if j==3 and i==2:xx+=cw*.23;yy-=ch*.15
+                dr.add(Circle(xx,yy,6,fillColor=colors.HexColor("#466D8A"),strokeColor=colors.white,strokeWidth=.8))
                 if len(g)>1:
-                    dr.add(String(xx,yy-2,str(len(g)),fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=colors.white))
+                    dr.add(String(xx,yy-2,str(len(g))+"×",fontName=BOLD,fontSize=6,textAnchor="middle",fillColor=colors.white))
                 else:dr.add(String(xx,yy-2,label,fontName=BOLD,fontSize=8,textAnchor="middle",fillColor=colors.white))
             story.append(dr)
-            add("V = AIT-VISTA. Numbered markers identify single products; dense cells show group size. Exact product categories follow.","small")
+            add("AIT-VISTA is the outlined reference beneath rival marks. Numbered markers identify single products; dense cells show group size. Exact product categories follow. Marker size is visual emphasis.","small")
         table(["# / product","Functional overlap","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,r["Functional overlap"],r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(d.iterrows())],[1.1,1,2.2])
+        heading("Map scope and exclusions")
+        from founder import map_exclusions
+        excluded=map_exclusions(rows,d)
+        if not excluded.empty:table(["Product","Reason not shown"],[(r.Product,r["Reason not shown"]) for _,r in excluded.iterrows()],[1,2])
+        else:add("All products included.")
         heading("AIT workflow criterion examples")
         stage={c:l for l,c in WORKFLOW_EXAMPLES if c in criteria}
         matrix_table(list(stage),stage)
@@ -118,7 +154,8 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     def advantage():
         heading("Competitive advantage")
         if not ids or not criteria:add("No direct comparison scope.");return
-        matrix_table(brief_criteria(data))
+        matrix_table(selected_criteria(data))
+        threat()
         a=advantage_summary(data,cfg,ids)
         if not a.empty:
             table(["Criterion","Finding","Customer importance","Decision"],[(r.Criterion,r.Finding,importance_lane(cfg,r["Criterion ID"]),r.Decision) for _,r in a.iterrows()],[1.5,1.5,1,1])
@@ -166,9 +203,12 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     add("Snapshot: "+(snapshot_hash or digest(data)),"small")
     add("Generated UTC: "+datetime.now(timezone.utc).isoformat(timespec="seconds"),"small")
     add("Report cohort: "+str(len(ids))+" products. AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
-    funcs={"Strategic overview":overview,"Competitor profile":profile_report,"Market positioning & workflow":market,"Competitive advantage":advantage,"Intelligence monitor":monitor,"QA & data integrity":qa}
+    def overview_with_threat():
+        overview()
+        threat()
+    funcs={"Strategic overview":overview_with_threat,"Competitor profile":profile_report,"Market positioning & workflow":market,"Competitive advantage":advantage,"Intelligence monitor":monitor,"QA & data integrity":qa}
     if kind=="Combined strategic report":
-        for i,fn in enumerate([overview,market,advantage,monitor,qa]):
+        for i,fn in enumerate([overview_with_threat,market,advantage,monitor,qa]):
             if i:story.append(PageBreak())
             fn()
     else:funcs[kind]()

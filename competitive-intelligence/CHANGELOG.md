@@ -2,7 +2,7 @@
 
 ## 1.4.8-rc1 — Scope separation and Space Priority
 
-- All-products maps and independent strategic benchmark controls, with explicit core labels.
+- All-products main Command Centre map; secondary Market Positioning and analytical filters default to strategic core. Independent reset controls and explicit core labels.
 - Complete-snapshot P0/P1/P2 derived queue and local CSV/PDF exports.
 - Independent report scopes; unchanged overlap methodology and source governance.
 

@@ -312,7 +312,7 @@ def positioning(st,data,cfg,rows):
     st.header("Market Positioning")
     st.caption("Which products address similar AIT workflows and have credible space-market relevance?")
     if rows.empty:return
-    scope,d=choose_cohort(st,rows,"market-map-scope","Market map scope","All products")
+    scope,d=choose_cohort(st,rows,"market-map-scope","Market map scope")
     names=rows.set_index("Product ID").Product.to_dict()
     ids=d["Product ID"].tolist()
     st.session_state["founder-map-products"]=ids

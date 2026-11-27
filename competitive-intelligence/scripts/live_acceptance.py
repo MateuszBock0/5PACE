@@ -73,6 +73,11 @@ def run():
                 report["Profiles"].append({"Company":name,"Product":core.value(products[pid],"Product Name"),"Sections":"7/7","Customer position":r["Customer position"],"Procurement":r["Procurement"],"Direct active pairs":sum(p==pid for p,c in direct_current(data))})
             for view in ["Command Centre","Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Advanced Analytics"]:
                 app.sidebar.radio[0].set_value(view).run();check(view);report["Workspaces"].append(view)
+                if view=="Market Positioning":
+                    assert set(app.session_state["founder-map-products"])==expected
+                    assert set(app.session_state["workflow-products"])==expected
+                if view=="Competitive Advantage":
+                    assert set(app.session_state["founder-adv-products"])==expected
             from pdf_reports import REPORTS,render_report
             from threat_watch import report_provenance
             report["PDF reports"]=[]

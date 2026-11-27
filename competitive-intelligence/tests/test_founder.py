@@ -48,15 +48,29 @@ def test_founder_navigation(monkeypatch,tmp_path):
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception,f"{page}: {app.exception}"
         if page=="Market Positioning":
-            assert app.selectbox(key="market-map-scope").value=="All products"
+            assert app.selectbox(key="market-map-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-map-products"]
             assert app.selectbox(key="workflow-benchmark-scope").value==DEFAULT_MAP_SCOPE
             assert not app.session_state["workflow-products"]
+            app.selectbox(key="market-map-scope").set_value("All products").run()
+            assert set(app.session_state["founder-map-products"])=={"DEMO-P1","DEMO-P2"}
+            assert not app.session_state["workflow-products"]
             app.selectbox(key="workflow-benchmark-scope").set_value("All products").run()
-            app.selectbox(key="market-map-scope").set_value(DEFAULT_MAP_SCOPE).run()
-            assert set(app.session_state["workflow-products"])=={"DEMO-P1","DEMO-P2"}
             app.button(key="market-map-scope-reset").click().run()
-            assert app.selectbox(key="market-map-scope").value=="All products"
+            assert app.selectbox(key="market-map-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-map-products"]
             assert app.selectbox(key="workflow-benchmark-scope").value=="All products"
+            assert set(app.session_state["workflow-products"])=={"DEMO-P1","DEMO-P2"}
+            app.button(key="workflow-benchmark-scope-reset").click().run()
+            assert not app.session_state["workflow-products"]
+            assert not app.exception
+        if page=="Competitive Advantage":
+            assert app.selectbox(key="adv-cohort-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-adv-products"]
+            app.selectbox(key="adv-cohort-scope").set_value("All products").run()
+            assert set(app.session_state["founder-adv-products"])=={"DEMO-P1","DEMO-P2"}
+            app.button(key="adv-cohort-scope-reset").click().run()
+            assert not app.session_state["founder-adv-products"]
             assert not app.exception
 
 def test_profile_strengths_and_commercial_changes():

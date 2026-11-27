@@ -122,6 +122,7 @@ def capture(out,live=False):
                           firstSize:gd.data[0].marker.size,
                           ids:gd.data.slice(1).flatMap(t=>(t.customdata||[]).map(d=>d[0])),
                           labels:gd.data.slice(1).flatMap(t=>Array.from(t.text||[])),
+                          points:gd.calcdata.slice(1).flatMap((ps,i)=>ps.map((p,j)=>({id:gd.data[i+1].customdata[j][0],x:p.x,y:p.y,label:gd.data[i+1].text[j]}))),
                           rivals:gd.data.slice(1).map(t=>({size:t.marker.size,opacity:t.marker.opacity,width:t.marker.line.width}))
                         })""")
                         assert style["background"].lower()=="#141f30",style
@@ -130,6 +131,7 @@ def capture(out,live=False):
                         assert "Example Robotics" in style["labels"],style
                         assert any(not s for s in style["labels"]),style
                         assert all("%" not in s for s in style["labels"]),style
+                        assert all(bool(p["label"])==(p["x"]>=(40 if p["y"]>=1.5 else 60)) for p in style["points"]),style
                         assert all(r["size"]==12 and r["opacity"]==1 and r["width"]>=1.5 for r in style["rivals"]),style
                     shot("01_Command_Centre")
                     for width,height in [(1280,800),(1920,1080)]:

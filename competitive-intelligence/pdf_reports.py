@@ -105,11 +105,11 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         frame,detail=portfolio_data(data,rows)
         if portfolio_company_ids is not None:frame=filter_companies(frame,CUSTOM,portfolio_company_ids)
         add("Company scope: "+("All companies with registered products" if portfolio_company_ids is None else "Explicit company selection")+" ("+str(len(frame))+" companies). All products of each selected company are evaluated. "+NOTE)
-        add("Dark teal = best single product; light teal = additional union coverage. * = Portfolio-only exposure under the existing 40/60 rule; product qualification is unchanged. Recorded and determinate coverage are evidence completeness, not performance. Historical/research/announced scope is included and identifiable; commercial-only sensitivity is separate.")
+        add("Dark teal = best single product; light teal = additional union coverage. * = Portfolio-only exposure under the existing 40/60 rule; product qualification is unchanged. R = recorded and D = determinate criterion coverage; evidence completeness, not performance. Historical/research/announced scope is included and identifiable; commercial-only sensitivity is separate.")
         if frame.empty:add("No companies in selected scope.");return
         for start in range(0,len(frame),16):
             g=frame.iloc[start:start+16]
-            height=27*len(g)+45;dr=Drawing(width,height);left=width*.39;span=width-left-44
+            height=27*len(g)+45;dr=Drawing(width,height);left=width*.34;span=width-left-100
             for tick in range(0,101,25):
                 x=left+tick*span/100
                 dr.add(Line(x,18,x,height-8,strokeColor=colors.HexColor("#DCE5EB"),strokeWidth=.5))
@@ -124,6 +124,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
                 if b:dr.add(Rect(left+a,y,b,11,fillColor=colors.HexColor("#72D8C8"),strokeColor=None))
                 if not a and not b:dr.add(Circle(left,y+5,2.5,fillColor=None,strokeColor=NAVY))
                 dr.add(String(left+a+b+5,y+2,f'{r["Portfolio coverage"]:.2%}',fontName=BOLD,fontSize=8,fillColor=NAVY))
+                dr.add(String(width-3,y+2,f'R {r["Recorded coverage"]:.0%} / D {r["Determinate coverage"]:.0%}',fontName=FONT,fontSize=7,textAnchor="end",fillColor=NAVY))
             story.append(dr)
             table(["Company / best product(s)","Union / best / additional","Coverage / status"],[(r.Company+"\n"+r["Company ID"]+"\n"+r["Best product ties"],f'{r["Portfolio coverage"]:.2%} / {r["Best single product coverage"]:.2%} / {r["Additional portfolio coverage"]*100:.2f} pp\nCommercial-only: {r["Commercial-only coverage"]:.2%}',f'Recorded / determinate: {r["Recorded coverage"]:.2%} / {r["Determinate coverage"]:.2%}\nPair coverage: {r["Pair recorded coverage"]:.2%} / {r["Pair determinate coverage"]:.2%}\n'+r["Portfolio flag"]+"\n"+r["Integration status"]) for _,r in g.iterrows()],[1.5,1,1.7])
         heading("Company portfolio evidence and attribution")

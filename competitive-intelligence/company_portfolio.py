@@ -37,7 +37,12 @@ def integration_evidence(data,cid,pids,products,ledger):
             clause=raw.casefold()
             if not re.search(REL,clause) or re.search(NEG,clause):continue
             for a,b in combinations(pids,2):
-                if not any(x[1]<=y[0] or y[1]<=x[0] for x in matches(clause,a) for y in matches(clause,b)):continue
+                # Require the relation itself between names, not mere co-mention.
+                def linked(x,y):
+                    if x[1]>y[0]:return False
+                    between=clause[x[1]:y[0]].strip()
+                    return bool(re.fullmatch(r"(?:(?:is|are|was|were|can|may|could|be|has been|will be|designed to)\s+)*"+REL,between))
+                if not any(linked(x,y) or linked(y,x) for x in matches(clause,a) for y in matches(clause,b)):continue
                 documented=quality=="Documented" and not re.search(POTENTIAL,clause) and not re.search(NEG,limitations.casefold())
                 records.append({"Register":register,"Reference":rid,"Product IDs":[a,b],"Status":"Documented integration" if documented else "Potential integration","Statement":raw.strip(),"Source":source,"Limitations":limitations})
     for pid in pids:
@@ -51,6 +56,11 @@ def integration_evidence(data,cid,pids,products,ledger):
         if value(r,"Product ID") not in pids:continue
         quality="Documented" if value(r,"Deployment Status")=="Documented implementation" and value(r,"Evidence Type") in {"Official documentation","Independent corroboration"} else "Claim"
         scan("Deployments",value(r,"Deployment ID"),value(r,"Source URL"),value(r,"Use Case")+"\n"+value(r,"Reported Results"),quality,value(r,"Evidence Limitations"))
+    company_name=value(registry(data,"Companies","Company ID").get(cid,{}),"Company Name").casefold()
+    for r in data.get("Key Competitors",{}).get("rows",[]):
+        if not company_name or value(r,"Company / project").casefold()!=company_name:continue
+        quality="Documented" if value(r,"Source type") in {"Official documentation","Official documentation — full review","Official deployment documentation","Official integration catalogue","Independent corroboration"} else "Claim"
+        scan("Key Competitors",value(r,"Evidence ID"),value(r,"Source URL"),value(r,"Evidence / finding"),quality,value(r,"Evidence limitations"))
     for (pid,c),e in ledger.items():
         if pid not in pids or e["status"] not in CREDIT:continue
         for r in e["rows"]:

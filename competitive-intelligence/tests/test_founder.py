@@ -29,6 +29,14 @@ def test_founder_navigation(monkeypatch,tmp_path):
     from founder import DEFAULT_MAP_SCOPE
     assert app.selectbox(key="landing-map-scope").value=="All products"
     assert set(app.session_state["landing-products"])=={"DEMO-P1","DEMO-P2"}
+    assert set(app.session_state["portfolio-company-ids"])=={"DEMO-CO-1","DEMO-CO-2"}
+    app.selectbox(key="portfolio-scope").set_value("Custom selection").run()
+    app.multiselect(key="portfolio-custom").set_value(["DEMO-CO-2"]).run()
+    assert app.session_state["portfolio-company-ids"]==["DEMO-CO-2"]
+    assert set(app.session_state["landing-products"])=={"DEMO-P1","DEMO-P2"}
+    app.button(key="portfolio-reset").click().run()
+    assert set(app.session_state["portfolio-company-ids"])=={"DEMO-CO-1","DEMO-CO-2"}
+    assert not app.exception
     assert app.selectbox(key="landing-benchmark-scope").value==DEFAULT_MAP_SCOPE
     assert not app.session_state["threat-products"]
     app.selectbox(key="landing-benchmark-scope").set_value("All products").run()

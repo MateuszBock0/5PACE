@@ -24,9 +24,17 @@ def portfolio_figure(frame,details):
         ix={p:i for i,p in enumerate(ids)}
         fig.add_trace(go.Scatter(x=[0]*len(zero),y=zero["Company ID"],mode="markers",name="No positive record",customdata=[custom[ix[p]] for p in zero["Company ID"]],hovertemplate=hover,marker={"size":12,"symbol":"circle-open","color":t["outline"],"line":{"width":1.5}},showlegend=False))
     for _,r in frame.iterrows():
-        fig.add_annotation(x=r["Portfolio coverage"]+.012,y=r["Company ID"],text=f'{r["Portfolio coverage"]:.2%}'+(" *" if r["Portfolio flag"]=="Portfolio-only exposure" else ""),xanchor="left",showarrow=False,font={"size":11,"color":t["text"]})
-    fig.update_layout(barmode="stack",bargap=.36,height=max(320,29*len(frame)+105),margin={"l":10,"r":20,"t":25,"b":70},legend={"orientation":"h","y":1.04,"x":0},xaxis={"range":[-.035,1.17],"tickformat":".0%","title":"Recorded portfolio coverage — eight core criteria"},yaxis={"categoryorder":"array","categoryarray":ids,"autorange":"reversed","tickmode":"array","tickvals":ids,"ticktext":labels,"automargin":True,"tickfont":{"size":11}},clickmode="event+select")
+        fig.add_annotation(x=r["Portfolio coverage"]+.012,y=r["Company ID"],text=f'{r["Portfolio coverage"]:.2%}'+(" *" if r["Portfolio flag"]=="Portfolio-only exposure" else ""),xanchor="left",showarrow=False,font={"size":11,"color":"#FBBF55" if r["Portfolio flag"]=="Portfolio-only exposure" else t["text"]})
+        fig.add_annotation(x=1.18,y=r["Company ID"],text=f'R {r["Recorded coverage"]:.0%} / D {r["Determinate coverage"]:.0%}',xanchor="left",showarrow=False,font={"size":10,"color":t["text"]})
+    fig.update_layout(barmode="stack",bargap=.36,height=max(320,29*len(frame)+105),margin={"l":10,"r":20,"t":25,"b":70},legend={"orientation":"h","y":1.04,"x":0},xaxis={"range":[-.035,1.52],"tickvals":[0,.25,.5,.75,1],"tickformat":".0%","title":"Recorded portfolio coverage — eight core criteria"},yaxis={"categoryorder":"array","categoryarray":ids,"autorange":"reversed","tickmode":"array","tickvals":ids,"ticktext":labels,"automargin":True,"tickfont":{"size":11}},clickmode="event+select")
     return fig
+
+def source_links(st,source):
+    for url in source.replace("\n",";").split(";"):
+        url=url.strip()
+        if url.startswith(("https://","http://")) and not any(ch.isspace() for ch in url):
+            st.markdown("[Open source]("+url.replace(")","%29")+")")
+        elif url:st.caption(url)
 
 def portfolio_view(st,data,rows,navigate,table,key="portfolio"):
     st.subheader("Company Portfolio Coverage")
@@ -45,7 +53,7 @@ def portfolio_view(st,data,rows,navigate,table,key="portfolio"):
     if st.session_state.get(key+"-company") not in allowed:st.session_state[key+"-company"]=allowed[0]
     render_chart(st,portfolio_figure(shown,details),use_container_width=True,key=key+"-chart",on_select=lambda:route(st,key,allowed),selection_mode="points")
     st.caption(NOTE)
-    st.caption("0% means no recorded positive core support, not confirmed technical absence. Criterion coverage counts any recorded / determinate pair for each criterion; pair coverage includes every product × criterion.")
+    st.caption("R = recorded criterion coverage; D = determinate criterion coverage (right column). 0% means no recorded positive core support, not confirmed technical absence. Pair coverage includes every product × criterion.")
     cid=st.selectbox("Inspect company portfolio (including 0%)",allowed,format_func=lambda c:names[c]+" | "+c,key=key+"-company")
     r=shown[shown["Company ID"]==cid].iloc[0];detail=details[cid]
     st.markdown("**"+r.Company+" — "+r["Portfolio flag"]+"**")
@@ -59,7 +67,7 @@ def portfolio_view(st,data,rows,navigate,table,key="portfolio"):
     st.caption("Documented or potential integration refers only to explicitly named product pairs, not the entire portfolio. No evidence is not incompatibility.")
     for i,e in enumerate(detail["integration"]):
         with st.expander(e["Status"]+" · "+" / ".join(e["Product IDs"])):
-            st.write(e["Statement"]);st.caption(e["Register"]+" | "+e["Reference"]+" | "+e["Limitations"]);st.write(e["Source"])
+            st.write(e["Statement"]);st.caption(e["Register"]+" | "+e["Reference"]+" | "+e["Limitations"]);source_links(st,e["Source"])
     p=detail["products"].copy()
     for col in ["Recorded overlap","Evidence coverage","Determinate coverage"]:p[col]=p[col].map(lambda x:f"{x:.2%}")
     table(st,p,key+"-products-"+cid,True)
@@ -74,7 +82,7 @@ def portfolio_view(st,data,rows,navigate,table,key="portfolio"):
         e=records.loc[idx]
         st.write(e.Rationale or "No active comparison rationale.")
         st.caption(e["Evidence level"]+" · "+e["Assessment date"]+" · "+e.Limitations)
-        st.write(e["Source URLs"])
+        source_links(st,e["Source URLs"])
         st.button("Open exact criterion evidence",key=key+"-evidence-"+cid,on_click=navigate,args=(st,e["Product ID"],cid,"Competitor Explorer",e["Criterion ID"],"Comparison Assessment" if e["Comparison ID"] else None,e["Comparison ID"] or None))
     with st.expander("Company portfolio summary — all selected companies"):
         table(st,shown[["Company","Portfolio coverage","Best single product coverage","Additional portfolio coverage","Recorded coverage","Determinate coverage","Portfolio flag","Integration status"]],key+"-summary",True)

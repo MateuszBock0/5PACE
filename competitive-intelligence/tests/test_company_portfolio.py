@@ -57,6 +57,8 @@ def test_named_integration_only_and_negative_claim():
     assert f.iloc[0]["Integration status"]=="Documented integration (specific pairs only)"
     d["Observations"]["rows"][-1]["Observation"]="Alpha Inspection Module is not integrated with Beta Records Module."
     assert portfolio_data(d)[0].iloc[0]["Integration status"]=="Compatibility unconfirmed"
+    d["Observations"]["rows"][-1]["Observation"]="Alpha Inspection Module integrates with Third Platform, and Beta Records Module connects to Other System."
+    assert portfolio_data(d)[0].iloc[0]["Integration status"]=="Compatibility unconfirmed"
 
 def test_portfolio_pdf_native_and_source_immutable():
     d=fixture();h=digest(d)

@@ -167,3 +167,6 @@ Threat Watch and a response-priority view reuse active comparison records; full/
 
 ## v1.4.5 — axis-union map and decision QA
 Default map includes every product with Space AIT target/case OR material/broad recorded overlap. No top-N cap, role or family filtering. Other scopes are retained. Threat Watch shows provisional evidence-ranked headlines plus separate procurement research, all active alternate records, and consistent selected criterion scope. PDF export offers explicit Threat Watch selection and criterion scope, and labels static reports separately from snapshot-change analysis. Native Windows browser acceptance remains separate from CI.
+
+## v1.4.6 — Dark mode
+Dark is the default native Streamlit theme. Charts use shared theme-aware styling, higher-contrast role colours, solid outlined competitor markers and distinct role symbols, with the 36:12 AIT-VISTA/rival hierarchy preserved. Heatmap evidence states retain their labels and distinct colours. Coordinates, data, source links, selection callbacks and report formats are unchanged. On Streamlit releases exposing the client theme, charts follow a native Light/Dark selection; older releases use the configured default. PDF stays print-friendly.

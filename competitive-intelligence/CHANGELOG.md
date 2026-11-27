@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.6-rc1 — Dark mode and visual contrast
+
+- Native dark theme, consistent chart palette and clearer outlined markers with stable role symbols.
+- Dark heatmap colours, readable grid, axis and hover labels; retain exact chart selections and marker hierarchy.
+- Add appearance regression tests and Chromium verification of dark map rendering.
+
 ## 1.4.5-rc1 — Default map and threat priority QA
 
 - Exact axis-based default union, no family or rank restriction; all-products recovery.

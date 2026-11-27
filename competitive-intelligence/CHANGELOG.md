@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0-rc1 — Market Positioning Intelligence
+
+- Dedicated Market Positioning workspace: shared-axis map including AIT-VISTA, dimension radar bounds, competitive proximity, company portfolios, advantage portfolio, evidence and weight sensitivity, workflow-stage benchmarking.
+- Fixed criterion denominators, selectable evidence thresholds and partial-support convention; no unknown imputation or automatic commercial score for AIT-VISTA.
+- Transparent provisional criterion grouping and optional local overrides; customer importance and commercial baseline optional.
+- No source schema, authorisation, data or automation changes.
+
 ## 1.2.0-rc1 — Database alignment
 
 - Provisional role classification with source rationale and explicit product-family grouping; no source label dictates threat rank.

@@ -15,5 +15,8 @@
   "research_stale_days": 90,
   "function_maturity": {},
   "demand_validation": {},
-  "command_profiles": {}
+  "command_profiles": {},
+  "positioning_dimensions": {},
+  "positioning_workflows": {},
+  "positioning_vista_commercial": {}
 }

@@ -122,7 +122,7 @@ def capture(out,live=False):
                           firstSize:gd.data[0].marker.size,
                           rivals:gd.data.slice(1).map(t=>({size:t.marker.size,opacity:t.marker.opacity,width:t.marker.line.width}))
                         })""")
-                        assert style["background"]=="#141F30",style
+                        assert style["background"].lower()=="#141f30",style
                         assert style["firstSize"]==36 and style["rivals"],style
                         assert all(r["size"]==12 and r["opacity"]==1 and r["width"]>=1.5 for r in style["rivals"]),style
                     shot("01_Command_Centre")

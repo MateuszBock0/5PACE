@@ -2,7 +2,7 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from chart_theme import plot, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
+from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
 from core import value,connect,read_snapshot
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
@@ -58,7 +58,7 @@ def render_map(st,data,rows,key,compact=False):
             fig.add_trace(tr)
     fig.add_hrect(y0=-.45,y1=.45,fillcolor=tokens()["band"],line_width=0,layer="below")
     fig.update_layout(height=340 if compact else 465,legend={"orientation":"h","y":-0.27,"font":{"size":10}},xaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Some","Material","Broad"],"range":[-.5,3.5],"title":"Recorded functional overlap","automargin":True},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":["Unresolved","Adjacent sector","Space AIT target","Space AIT case"],"range":[-.5,3.5],"title":"Customer evidence","automargin":True},margin={"t":12,"b":95,"l":15,"r":15})
-    plot(st,fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"product"),selection_mode="points")
+    render_chart(st,fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"product"),selection_mode="points")
     if len(d)>0:
         st.caption("Dense points: use the product selector below the chart as an exact-ID fallback; zoom to inspect nearby points.")
         dense=d.groupby(["X","Y"]).size()
@@ -143,7 +143,7 @@ def heatmap(st,data,cfg,rows,key,ids=None,stage_labels=None):
         fig.add_shape(type="rect",x0=j-.46,x1=j+.46,y0=i-.38,y1=i+.38,fillcolor=colors[code.get(s,1)],line={"width":0},layer="below")
     fig.update_layout(height=max(320,40*len(ids)+100),plot_bgcolor=tokens()["plot"],paper_bgcolor=tokens()["background"],xaxis={"tickmode":"array","tickvals":list(range(len(current_labels))),"ticktext":[n if len(n)<=18 else n[:15]+"…" for n in current_labels],"tickangle":-30,"automargin":True,"range":[-.6,len(current_labels)-.4]},yaxis={"tickmode":"array","tickvals":list(range(len(labels))),"ticktext":labels,"automargin":True,"range":[len(labels)-.5,-.5]},margin={"l":15,"r":15,"t":15,"b":80})
     chartkey="heat-"+key
-    plot(st,fig,use_container_width=True,key=chartkey,on_select=lambda:chart_route(st,chartkey,data,"criterion"),selection_mode="points")
+    render_chart(st,fig,use_container_width=True,key=chartkey,on_select=lambda:chart_route(st,chartkey,data,"criterion"),selection_mode="points")
     pc=ps[0] if key=="profile" else None
     pending=st.session_state.pop("profile_criterion_pending",None) if key=="profile" else None
     cc=pending if pending in ids else None
@@ -337,7 +337,7 @@ def advantage(st,data,cfg,rows):
     d["Display criterion"]=d.Criterion
     fig=px.scatter(d,x="Functional finding",y="Display criterion",color="Importance evidence",hover_data=["Delta lower","Delta upper","Rarity lower","Rarity upper","Customer demand"],custom_data=["Criterion ID"])
     fig.update_layout(height=max(430,24*len(d)+120),xaxis_title="Evidence-bounded functional finding",yaxis_title="",legend={"orientation":"h"})
-    event=plot(st,fig,use_container_width=True,key="adv-findings-plot",on_select="rerun",selection_mode="points")
+    event=render_chart(st,fig,use_container_width=True,key="adv-findings-plot",on_select="rerun",selection_mode="points")
     points=event.selection.points if event is not None and hasattr(event,"selection") else []
     chosen=points[0].get("customdata",[]) if points else []
     if chosen:
@@ -350,7 +350,7 @@ def advantage(st,data,cfg,rows):
         mapped["Width"]=mapped["Rarity upper"]-mapped["Rarity lower"];mapped["Zero"]=0.
         fig=px.scatter(mapped,x="Rarity lower",y="Importance evidence",color="Finding",hover_name="Criterion",error_x="Width",error_x_minus="Zero")
         fig.update_layout(xaxis={"range":[0,1.05],"tickformat":".0%","title":"Evidence-bounded differentiation rarity"},yaxis={"categoryorder":"array","categoryarray":["Low","Medium","High"]})
-        plot(st,fig,use_container_width=True)
+        render_chart(st,fig,use_container_width=True)
     with st.expander("Portfolio evidence and decisions"):table(st,d[["Criterion","Finding","Importance evidence","Customer demand","Decision"]],"advantage-findings",True)
     st.caption("Functional advantage is conditional on the selected cohort and evidence. Unknown competitor scope and unvalidated importance do not establish commercial advantage.")
     select_product(st,selected,"adv-portfolio")
@@ -370,7 +370,7 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
     if not plot.empty:
         fig=px.scatter(plot,x="Parsed date",y="Company",color="Date basis",hover_name="Product",custom_data=["Product ID","Company ID","Register","Reference"],hover_data=["Date","Development","Strategic implication","Discovery / review date"])
         fig.update_layout(height=max(330,24*plot.Company.nunique()+120),xaxis_title="Recorded or reported date",yaxis_title="")
-        plot(st,fig,use_container_width=True,key="monitor-timeline-plot",on_select=lambda:chart_route(st,"monitor-timeline-plot",data,"signal"),selection_mode="points")
+        render_chart(st,fig,use_container_width=True,key="monitor-timeline-plot",on_select=lambda:chart_route(st,"monitor-timeline-plot",data,"signal"),selection_mode="points")
     table(st,filtered[["Date","Date basis","Discovery / review date","Company","Product","Development","Strategic implication","Limitations","Source"]].head(50),"timeline",True)
     with st.expander("Full research and assessment history"):table(st,timeline(data),"raw-timeline",True)
     if not rows.empty:select_product(st,rows,"timeline")
@@ -417,7 +417,7 @@ def response_view(st,data,cfg,rows,key,cids=None):
     fig=px.scatter(points,x="Display X",y="Display Y",color="Action",color_discrete_map=action_colors(),hover_name="Criterion",custom_data=["Product ID","Criterion ID","Comparison ID"],hover_data={"Display X":False,"Display Y":False,"Overlap":True,"Importance":True,"Product":True,"Verdict":True,"Evidence":True,"Assessment date":True,"Next decision":True})
     fig.update_traces(marker={"size":14,"opacity":1,"line":{"width":1.7,"color":tokens()["outline"]}})
     fig.update_layout(height=340,xaxis={"tickmode":"array","tickvals":list(range(3)),"ticktext":["Unresolved","Partial","Full"],"range":[-.5,2.5],"title":"Recorded overlap"},yaxis={"tickmode":"array","tickvals":list(range(4)),"ticktext":ys,"range":[-.5,3.5],"title":"Customer importance"},legend={"orientation":"h"})
-    plot(st,fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"record"),selection_mode="points")
+    render_chart(st,fig,use_container_width=True,key=key,on_select=lambda:chart_route(st,key,data,"record"),selection_mode="points")
     st.caption("Unresolved importance is separate. React requires high provenance-bearing importance and technical-or-stronger positive evidence; Benchmark / Research / Monitor are action categories, not risk percentages.")
     c=st.selectbox("Inspect response criterion",e["Criterion ID"].tolist(),format_func=e.set_index("Criterion ID")["Short criterion"].to_dict().get,key=key+"-criterion")
     r=e[e["Criterion ID"]==c].iloc[0]

@@ -73,7 +73,7 @@ def style_chart(fig,mode=None):
         # A deliberately invisible marker is the selectable heatmap hit area.
         if typ!="bar" and marker.opacity is not None and isinstance(marker.opacity,(int,float)) and marker.opacity<.05:
             continue
-        if typ!="bar" and marker.size==36:
+        if typ!="bar" and isinstance(marker.size,(int,float)) and marker.size==36:
             # Reference is explicitly drawn first by map builders.
             continue
         if isinstance(marker.color,str):marker.color=remap(marker.color)
@@ -93,6 +93,6 @@ def style_chart(fig,mode=None):
                 err.color=t["text"];err.thickness=1.3;err.width=3
     return fig
 
-def plot(container,fig,**kwargs):
+def render_chart(container,fig,**kwargs):
     # We own the palette; avoid Streamlit replacing explicit Plotly defaults.
     return container.plotly_chart(style_chart(fig),theme=None,**kwargs)

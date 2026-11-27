@@ -17,9 +17,9 @@ from reportlab.graphics.shapes import Drawing,Rect,Circle,String,Line
 from core import value,digest,validate
 from command_engine import registry,direct_matrix,direct_current,matrix_audit,research_queue,profile
 from product_intelligence import CRITERIA
-from founder import summaries,strategic_map_cohort,brief_criteria,profile_records,advantage_summary,profile_findings,WORKFLOW_EXAMPLES
+from founder import DEFAULT_MAP_SCOPE,summaries,strategic_map_cohort,brief_criteria,profile_records,advantage_summary,profile_findings,WORKFLOW_EXAMPLES
 from decision import signals,CUSTOMER_LANES,FUNCTION_LANES,importance_lane
-from threat_watch import exposure,report_provenance,selected_criteria,spread_points
+from threat_watch import exposure,report_provenance,selected_criteria,spread_points,exposure_records,priority_records
 
 REPORTS=["Strategic overview","Competitor profile","Market positioning & workflow","Competitive advantage","Intelligence monitor","QA & data integrity","Combined strategic report"]
 MIME="application/pdf"
@@ -42,7 +42,7 @@ def text(v):
     except (ValueError,TypeError):pass
     return str(v)
 
-def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source=""):
+def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None):
     if kind not in REPORTS:raise ValueError("Unknown report type")
     captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
     fonts()
@@ -54,6 +54,8 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     else:chosen=list(dict.fromkeys(p for p in product_ids if p in products))
     d=rows[rows["Product ID"].isin(chosen)] if not rows.empty else rows
     ids=d["Product ID"].tolist() if not d.empty else []
+    cids=selected_criteria(data) if criterion_ids is None else [c for c in criterion_ids if c in criteria]
+    map_scope=map_scope or (DEFAULT_MAP_SCOPE if product_ids is None else "Explicit product selection")
     buf=BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,rightMargin=39,leftMargin=39,topMargin=48,bottomMargin=43,title="5PACE | "+kind,author="5PACE")
     width=A4[0]-78
     styles={
@@ -93,7 +95,8 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         table(["Company / product","Competitive role and decision","Evidence / uncertainty"],[(r.Company+"\n"+r.Product,r.Role+"\n"+r.Decision,r["Why care"]+"\n"+r.Unresolved) for _,r in d.iterrows()],[1.2,1.6,2.5])
     def threat():
         heading("Threat Watch and response priorities")
-        e=exposure(data,cfg,ids)
+        add("Threat Watch scope: "+str(len(ids))+" products; "+str(len(cids))+" criteria. Provisional review order; changes between snapshots are not included in this static report.")
+        e=exposure(data,cfg,ids,cids)
         if not e.empty:
             xs=["No positive record / unresolved","Partial recorded","Full recorded"];ys=["Unresolved","Low","Medium","High"]
             dr=Drawing(width,164);left=75;bottom=27;cw=(width-left-6)/3;ch=30
@@ -108,6 +111,10 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
             story.append(dr)
             add("Response map: customer importance by recorded overlap. Counts group criteria in the same category; exact action and evidence are listed below.","small")
             table(["Criterion / action","Product / verdict","Evidence and next decision"],[(r["Short criterion"]+"\n"+r.Action,r.Product+"\n"+r.Verdict,r.Evidence+" | "+r["Assessment date"]+" | "+r["Comparison ID"]+"\n"+r["Next decision"]+"\n"+r.Source) for _,r in e.iterrows()],[1,1,2.5])
+            records=priority_records(exposure_records(data,cfg,ids,cids))
+            if not records.empty:
+                add("All active comparison records (including alternate and conflicting verdicts); absent records remain unresolved.","sub")
+                table(["Product / criterion","Pair / record verdict","Evidence, ID, date / decision"],[(r.Product+"\n"+r["Short criterion"],r.Verdict+" / "+r["Record verdict"],r.Evidence+" | "+r["Comparison ID"]+" | "+r["Assessment date"]+"\n"+r.Action+"\n"+r.Limitations+"\n"+r.Source) for _,r in records.iterrows() if r["Comparison ID"]],[1.2,1,2.5])
             add("Importance without provenance is unresolved. Recorded support is not performance or commercial substitution.")
     def market():
         heading("Technology × customer positioning")
@@ -136,8 +143,9 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
             add("AIT-VISTA is the outlined reference beneath rival marks. Numbered markers identify single products; dense cells show group size. Exact product categories follow. Marker size is visual emphasis.","small")
         table(["# / product","Functional overlap","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,r["Functional overlap"],r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(d.iterrows())],[1.1,1,2.2])
         heading("Map scope and exclusions")
+        add(map_scope+" — "+str(len(ids))+" of "+str(len(rows))+" products. Default union uses original categories; no family or role restriction.")
         from founder import map_exclusions
-        excluded=map_exclusions(rows,d)
+        excluded=map_exclusions(rows,d,map_scope)
         if not excluded.empty:table(["Product","Reason not shown"],[(r.Product,r["Reason not shown"]) for _,r in excluded.iterrows()],[1,2])
         else:add("All products included.")
         heading("AIT workflow criterion examples")
@@ -154,7 +162,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     def advantage():
         heading("Competitive advantage")
         if not ids or not criteria:add("No direct comparison scope.");return
-        matrix_table(selected_criteria(data))
+        matrix_table(cids)
         threat()
         a=advantage_summary(data,cfg,ids)
         if not a.empty:
@@ -202,7 +210,7 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     add("Captured UTC: "+(captured or "Not recorded")+" | Source: "+(source or "Not recorded"))
     add("Snapshot: "+(snapshot_hash or digest(data)),"small")
     add("Generated UTC: "+datetime.now(timezone.utc).isoformat(timespec="seconds"),"small")
-    add("Report cohort: "+str(len(ids))+" products. AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
+    add("Report cohort: "+str(len(ids))+" products; Threat Watch criteria: "+str(len(cids))+". AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
     def overview_with_threat():
         overview()
         threat()

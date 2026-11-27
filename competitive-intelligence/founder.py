@@ -172,12 +172,17 @@ def commercial_summary(records):
         if text:out.append(text)
     return out or ["Commercial model / pricing not recorded."]
 
-def strategic_map_cohort(rows,scope="Strategic + research",limit=10):
-    """Keep research entrants visible independently of their commercial rank.
-    Family representatives are actual products; all-products mode exposes modules.
-    """
+DEFAULT_MAP_SCOPE="Strategically relevant (axis union)"
+MAP_SCOPES=[DEFAULT_MAP_SCOPE,"Strategic + research","Commercial shortlist","Research & emerging","All products"]
+
+def axis_eligible(rows):
+    return rows["Customer position"].isin(["Space AIT target segment","Space AIT implementation case"]) | rows["Functional overlap"].isin(["Material recorded overlap","Broad recorded overlap"])
+
+def strategic_map_cohort(rows,scope=DEFAULT_MAP_SCOPE,limit=10):
+    """Default union evaluated for every actual product, without role/family/rank filters."""
     if rows.empty:return rows.copy()
     if scope=="All products":return rows.copy()
+    if scope==DEFAULT_MAP_SCOPE:return rows[axis_eligible(rows)].copy()
     f=priority_families(rows)
     research=f[f.Role=="Research / emerging entrant"]
     if scope=="Research & emerging":return research.copy()
@@ -185,11 +190,14 @@ def strategic_map_cohort(rows,scope="Strategic + research",limit=10):
     if scope=="Commercial shortlist":return commercial.copy()
     return pd.concat([commercial,research],ignore_index=True).drop_duplicates("Family ID")
 
-def map_exclusions(rows,shown):
+def map_exclusions(rows,shown,scope=None):
     if rows.empty:return pd.DataFrame()
     selected=set(shown["Product ID"]) if not shown.empty else set()
     d=rows[~rows["Product ID"].isin(selected)].copy()
     if d.empty:return d
     families=set(shown["Family ID"]) if not shown.empty else set()
-    d["Reason not shown"]=d.apply(lambda r:"Another family member is shown" if r["Family ID"] in families else "Outside selected map scope or shortlist limit",axis=1)
+    if scope==DEFAULT_MAP_SCOPE:
+        d["Reason not shown"]="Neither target/case customer evidence nor material/broad recorded overlap"
+    else:
+        d["Reason not shown"]=d.apply(lambda r:"Another family member is shown (selected shortlist only)" if r["Family ID"] in families else "Outside selected map scope or shortlist limit",axis=1)
     return d

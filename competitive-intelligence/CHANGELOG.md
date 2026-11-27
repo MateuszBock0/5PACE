@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.5-rc1 — Default map and threat priority QA
+
+- Exact axis-based default union, no family or rank restriction; all-products recovery.
+- Evidence-ranked headlines, separate budget research, exact assessment navigation and consistent scope in PDF exports.
+- Exhaustive 16-cell map test and alternate/disputed evidence tests.
+
 ## 1.4.4-rc1 — Threat Watch and consolidated QA
 
 - Evidence-first strategic exposure, response categories and direct criterion routing.

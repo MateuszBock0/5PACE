@@ -14,7 +14,7 @@ def test_research_entrant_is_visible_independently_of_commercial_rank():
     d=comparison_fixture()
     d["Products"]["rows"][0].update({"Commercial Status":"Research","Competition Type":"Potential entrant"})
     r=summaries(d)
-    shown=strategic_map_cohort(r,limit=0)
+    shown=strategic_map_cohort(r,"Strategic + research",limit=0)
     assert "DEMO-P1" in set(shown["Product ID"])
     assert "DEMO-P1" not in set(strategic_map_cohort(r,"Commercial shortlist")["Product ID"])
     assert set(strategic_map_cohort(r,"All products")["Product ID"])==set(r["Product ID"])

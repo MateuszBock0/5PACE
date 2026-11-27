@@ -83,30 +83,44 @@ def capture(out):
                         if errors.count():raise RuntimeError(errors.first.inner_text())
                     def shot(name):
                         page.screenshot(path=str(out/(name+".png")),animations="disabled")
+                    def top():
+                        page.evaluate("""() => {
+                          document.scrollingElement.scrollTop=0;
+                          for (const el of document.querySelectorAll('main,section,div')) {
+                            if (el.scrollHeight>el.clientHeight+5 && el.scrollTop>0) el.scrollTop=0;
+                          }
+                        }""")
+                        page.wait_for_timeout(350)
+                    def section(name):
+                        page.get_by_role("heading",name=name,exact=True).evaluate("(el) => el.scrollIntoView({block:'start',inline:'nearest'})")
+                        page.wait_for_timeout(400)
                     def nav(name):
                         page.get_by_test_id("stSidebar").get_by_text(name,exact=True).click()
                         ready(name)
+                        top()
                     ready("Competitive Command Centre")
                     shot("01_Command_Centre")
                     page.get_by_role("button",name="Open profile",exact=True).first.click()
                     ready("Competitor Explorer")
+                    top()
                     shot("02_Competitor_Explorer")
                     page.get_by_text("Compare",exact=True).click()
                     page.get_by_text("Inspect criterion evidence",exact=True).wait_for(timeout=30000)
                     page.wait_for_timeout(700)
-                    page.get_by_text("Inspect criterion evidence",exact=True).scroll_into_view_if_needed()
+                    page.get_by_text("Inspect criterion evidence",exact=True).evaluate("(el)=>el.scrollIntoView({block:'center'})")
                     shot("03_Profile_Comparison")
                     nav("Market Positioning")
                     shot("04_Market_Positioning")
-                    page.get_by_role("heading",name="AIT workflow coverage",exact=True).scroll_into_view_if_needed()
-                    page.wait_for_timeout(400)
+                    section("AIT workflow coverage")
                     shot("05_AIT_Workflow")
                     nav("Competitive Advantage")
                     shot("06_Competitive_Advantage")
-                    page.get_by_role("heading",name="Differentiation portfolio",exact=True).scroll_into_view_if_needed()
+                    section("Differentiation portfolio")
                     shot("07_Advantage_Portfolio")
                     nav("Intelligence Monitor")
                     shot("08_Intelligence_Monitor")
+                    assert (out/"04_Market_Positioning.png").read_bytes() != (out/"05_AIT_Workflow.png").read_bytes(), "Map and workflow screenshots are identical"
+                    assert (out/"06_Competitive_Advantage.png").read_bytes() != (out/"07_Advantage_Portfolio.png").read_bytes(), "Advantage screenshots are identical"
                     browser.close()
             finally:
                 p.terminate()

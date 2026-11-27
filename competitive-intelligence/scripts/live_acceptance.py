@@ -42,6 +42,15 @@ def run():
             expected={r["Product ID"] for _,r in rows.iterrows() if r["Recorded overlap fraction"]>=.6 or (r["Recorded overlap fraction"]>=.4 and r["Customer position"] in {"Space AIT target segment","Space AIT implementation case"})}
             assert set(strategic_map_cohort(rows)["Product ID"])==expected
             assert set(strategic_map_cohort(rows,"All products")["Product ID"])==set(products)
+            assert set(app.session_state["landing-products"])==set(products)
+            assert set(app.session_state["threat-products"])==expected
+            app.selectbox(key="landing-map-scope").set_value(DEFAULT_MAP_SCOPE).run();check("Map scope independence")
+            assert set(app.session_state["landing-products"])==expected and set(app.session_state["threat-products"])==expected
+            app.button(key="landing-map-scope-reset").click().run();check("Map reset independence")
+            assert set(app.session_state["landing-products"])==set(products) and set(app.session_state["threat-products"])==expected
+            from space_research import priority_queue
+            q=priority_queue(data,core.config(),h,snap[1])
+            assert not q.duplicated(["Product ID","Criterion ID"]).any()
             companies=registry(data,"Companies","Company ID")
             report={"Snapshot hash":h,"Capture UTC":snap[1],"Source":snap[2],"Mode":mode,
                     "Validation errors":errors,"Validation warnings":warnings,"Default map eligible IDs":sorted(expected),"All product IDs":sorted(products),"Profiles":[],"Workspaces":[],"Browser clicks":"Not tested by AppTest; verify with live browser capture."}
@@ -64,6 +73,11 @@ def run():
                 report["Profiles"].append({"Company":name,"Product":core.value(products[pid],"Product Name"),"Sections":"7/7","Customer position":r["Customer position"],"Procurement":r["Procurement"],"Direct active pairs":sum(p==pid for p,c in direct_current(data))})
             for view in ["Command Centre","Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Advanced Analytics"]:
                 app.sidebar.radio[0].set_value(view).run();check(view);report["Workspaces"].append(view)
+                if view=="Market Positioning":
+                    assert set(app.session_state["founder-map-products"])==expected
+                    assert set(app.session_state["workflow-products"])==expected
+                if view=="Competitive Advantage":
+                    assert set(app.session_state["founder-adv-products"])==expected
             from pdf_reports import REPORTS,render_report
             from threat_watch import report_provenance
             report["PDF reports"]=[]

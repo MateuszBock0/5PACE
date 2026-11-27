@@ -26,12 +26,52 @@ def test_founder_navigation(monkeypatch,tmp_path):
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=45).run()
     assert not app.exception
     assert app.sidebar.radio[0].value=="Command Centre"
+    from founder import DEFAULT_MAP_SCOPE
+    assert app.selectbox(key="landing-map-scope").value=="All products"
+    assert set(app.session_state["landing-products"])=={"DEMO-P1","DEMO-P2"}
+    assert app.selectbox(key="landing-benchmark-scope").value==DEFAULT_MAP_SCOPE
+    assert not app.session_state["threat-products"]
+    app.selectbox(key="landing-benchmark-scope").set_value("All products").run()
+    app.selectbox(key="landing-map-scope").set_value(DEFAULT_MAP_SCOPE).run()
+    assert not app.exception
+    assert not app.session_state["landing-products"]
+    assert set(app.session_state["threat-products"])=={"DEMO-P1","DEMO-P2"}
+    app.button(key="landing-map-scope-reset").click().run()
+    assert app.selectbox(key="landing-map-scope").value=="All products"
+    assert app.selectbox(key="landing-benchmark-scope").value=="All products"
+    app.button(key="landing-benchmark-scope-reset").click().run()
+    assert not app.session_state["threat-products"]
     next(b for b in app.button if b.label=="Open profile").click().run()
     assert app.sidebar.radio[0].value=="Competitor Explorer"
     assert not app.exception
     for page in ["Market Positioning","Competitive Advantage","Intelligence Monitor","Competitor Explorer","Command Centre"]:
         app.sidebar.radio[0].set_value(page).run()
         assert not app.exception,f"{page}: {app.exception}"
+        if page=="Market Positioning":
+            assert app.selectbox(key="market-map-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-map-products"]
+            assert app.selectbox(key="workflow-benchmark-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["workflow-products"]
+            app.selectbox(key="market-map-scope").set_value("All products").run()
+            assert set(app.session_state["founder-map-products"])=={"DEMO-P1","DEMO-P2"}
+            assert not app.session_state["workflow-products"]
+            app.selectbox(key="workflow-benchmark-scope").set_value("All products").run()
+            app.button(key="market-map-scope-reset").click().run()
+            assert app.selectbox(key="market-map-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-map-products"]
+            assert app.selectbox(key="workflow-benchmark-scope").value=="All products"
+            assert set(app.session_state["workflow-products"])=={"DEMO-P1","DEMO-P2"}
+            app.button(key="workflow-benchmark-scope-reset").click().run()
+            assert not app.session_state["workflow-products"]
+            assert not app.exception
+        if page=="Competitive Advantage":
+            assert app.selectbox(key="adv-cohort-scope").value==DEFAULT_MAP_SCOPE
+            assert not app.session_state["founder-adv-products"]
+            app.selectbox(key="adv-cohort-scope").set_value("All products").run()
+            assert set(app.session_state["founder-adv-products"])=={"DEMO-P1","DEMO-P2"}
+            app.button(key="adv-cohort-scope-reset").click().run()
+            assert not app.session_state["founder-adv-products"]
+            assert not app.exception
 
 def test_profile_strengths_and_commercial_changes():
     import copy

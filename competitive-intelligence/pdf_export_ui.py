@@ -32,22 +32,24 @@ def export_panel(st,data,cfg,snapshots,current,head,demo,primary,location="sideb
         elif scope=="Current view selection":
             ss=st.session_state
             if primary=="Competitor Explorer":ids=[ss.get("founder-product-"+str(ss.get("founder_company","")))]
-            elif primary=="Market Positioning":ids=ss.get("founder-map-products",[])
+            elif primary=="Market Positioning":ids=ss.get("workflow-products",[])
             elif primary=="Competitive Advantage":ids=ss.get("founder-adv-products",[])
-            elif primary=="Command Centre":ids=ss.get("landing-products",[])
+            elif primary=="Command Centre":ids=ss.get("threat-products",[])
             else:ids=list(names)
             ids=[i for i in ids if i in names]
         else:ids=strategic_map_cohort(r,scope)["Product ID"].tolist() if names else []
         ids=[i for i in ids if i in names]
         crit_scope=st.selectbox("Threat / comparison criteria",["Current Threat Watch","Strategic criteria","All criteria"],key=k+"-criteria")
         cids=list(registry(data,CRITERIA,"Criterion ID")) if crit_scope=="All criteria" or (crit_scope=="Current Threat Watch" and st.session_state.get("threat-all",False)) else selected_criteria(data)
-        actual_scope=st.session_state.get({"Command Centre":"landing-map-scope","Market Positioning":"market-map-scope","Competitive Advantage":"adv-cohort-scope"}.get(primary,""),scope) if scope=="Current view selection" else scope
+        actual_scope=st.session_state.get({"Command Centre":"landing-benchmark-scope","Market Positioning":"workflow-benchmark-scope","Competitive Advantage":"adv-cohort-scope"}.get(primary,""),scope) if scope=="Current view selection" else scope
         st.caption(f"{len(cids)} criteria in Threat Watch and strategic comparison; profile and QA retain full scope.")
         st.caption(f"{len(ids)} products · {mode}. PDF uses this snapshot and explicit scope, not live data. QA checks the entire snapshot.")
-        signature=(h,mode,stamp,source,kind,tuple(ids),tuple(cids),actual_scope,repr(cfg.get("command_profiles",{})))
+        map_choice=st.selectbox("Map scope in PDF",["All products","Current map selection"],key=k+"-map-scope")
+        map_ids=None if map_choice=="All products" else st.session_state.get("landing-products" if primary=="Command Centre" else "founder-map-products",list(names))
+        signature=(h,mode,stamp,source,kind,tuple(ids),tuple(cids),actual_scope,None if map_ids is None else tuple(map_ids),repr(cfg.get("command_profiles",{})))
         if st.button("Generate PDF",key=k+"-generate",disabled=(not ids and kind=="Competitor profile")):
             try:
-                payload=render_report(data,cfg,kind,ids,mode,stamp,h,source,criterion_ids=cids,map_scope=actual_scope)
+                payload=render_report(data,cfg,kind,ids,mode,stamp,h,source,criterion_ids=cids,map_scope=actual_scope,map_product_ids=map_ids)
                 st.session_state[k+"-prepared"]=(signature,payload)
             except Exception as exc:st.error("PDF export failed: "+type(exc).__name__+": "+str(exc)[:180])
         prepared=st.session_state.get(k+"-prepared")

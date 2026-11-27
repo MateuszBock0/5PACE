@@ -120,10 +120,18 @@ def capture(out,live=False):
                         style=chart.evaluate("""gd=>({
                           background:gd._fullLayout.plot_bgcolor,
                           firstSize:gd.data[0].marker.size,
+                          ids:gd.data.slice(1).flatMap(t=>(t.customdata||[]).map(d=>d[0])),
+                          labels:gd.data.slice(1).flatMap(t=>Array.from(t.text||[])),
+                          points:gd.calcdata.slice(1).flatMap((ps,i)=>ps.map((p,j)=>({id:gd.data[i+1].customdata[j][0],x:p.x,y:p.y,label:gd.data[i+1].text[j]}))),
                           rivals:gd.data.slice(1).map(t=>({size:t.marker.size,opacity:t.marker.opacity,width:t.marker.line.width}))
                         })""")
                         assert style["background"].lower()=="#141f30",style
                         assert style["firstSize"]==36 and style["rivals"],style
+                        assert set(style["ids"])=={"DEMO-P1","DEMO-P2","DEMO-P3","DEMO-P4"},style
+                        assert "Example Robotics" in style["labels"],style
+                        assert any(not s for s in style["labels"]),style
+                        assert all("%" not in s for s in style["labels"]),style
+                        assert all(bool(p["label"])==(p["x"]>=(40 if p["y"]>=1.5 else 60)) for p in style["points"]),style
                         assert all(r["size"]==12 and r["opacity"]==1 and r["width"]>=1.5 for r in style["rivals"]),style
                     shot("01_Command_Centre")
                     for width,height in [(1280,800),(1920,1080)]:
@@ -202,7 +210,7 @@ def capture(out,live=False):
                 p.terminate()
                 try:p.wait(timeout=10)
                 except subprocess.TimeoutExpired:p.kill()
-    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.7 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
+    (out/"README.txt").write_text("Actual browser screenshots of the v1.4.8 Streamlit app (dark mode).\n"+("Private actual local snapshot; do not publish.\n" if live else "All displayed companies, prices, deployments and competitor evidence are fictitious UI fixtures. Not a live 5PACE dataset or research result.\n"),encoding="utf-8")
     if live:
         from zipfile import ZipFile,ZIP_DEFLATED
         with ZipFile(out.parent/"5PACE_live_screenshots.zip","w",ZIP_DEFLATED) as z:

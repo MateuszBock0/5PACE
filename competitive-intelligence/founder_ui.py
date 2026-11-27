@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from chart_theme import render_chart, tokens, role_colors, action_colors, reference_marker, rival_marker, heatmap_colors, colors as chart_colors
-from core import value,connect,read_snapshot
+from core import value,connect,read_snapshot,digest
+from space_research import priority_queue
 from command_engine import registry,direct_matrix,profile,research_queue,comparison_changes,ASSESS
 from product_intelligence import CRITERIA
 from positioning import taxonomy,interval_arrays,workflow_benchmark,VISTA,ALL
@@ -44,20 +45,20 @@ def chart_route(st,key,data,kind):
         reference=d[2] if kind=="record" and len(d)>2 else None
         navigate(st,pid,value(p,"Company ID"),criterion=criterion,register="Comparison Assessment" if reference else None,reference=reference)
 
-def reset_scope(st,key):
-    st.session_state[key]=DEFAULT_MAP_SCOPE
+def reset_scope(st,key,default=DEFAULT_MAP_SCOPE):
+    st.session_state[key]=default
     st.session_state.pop(key+"-custom",None)
 
-def choose_cohort(st,rows,key,label="Product scope"):
-    scope=st.selectbox(label,MAP_SCOPES,key=key)
-    st.button("Reset to default",key=key+"-reset",on_click=reset_scope,args=(st,key))
-    default=strategic_map_cohort(rows)
+def choose_cohort(st,rows,key,label="Product scope",default_scope=DEFAULT_MAP_SCOPE):
+    scope=st.selectbox(label,MAP_SCOPES,index=MAP_SCOPES.index(default_scope),key=key)
+    st.button("Reset to default",key=key+"-reset",on_click=reset_scope,args=(st,key,default_scope))
+    default=strategic_map_cohort(rows,default_scope)
     names=rows.set_index("Product ID").Product.to_dict()
     if scope=="Custom selection":
         ids=st.multiselect("Select products",list(names),default=default["Product ID"].tolist(),format_func=names.get,key=key+"-custom")
         d=rows[rows["Product ID"].isin(ids)].copy()
     else:d=strategic_map_cohort(rows,scope)
-    st.caption(f"{len(d)} of {len(rows)} products · default: ≥60% recorded overlap in any market OR ≥40% with Space AIT target/case evidence. Missing evidence is not non-support.")
+    st.caption(f"{len(d)} of {len(rows)} products · default: "+("All products" if default_scope=="All products" else "≥60% recorded overlap OR ≥40% with Space AIT target/case evidence")+". Missing evidence is not non-support.")
     if d.empty:st.info("No products meet this selected scope. Use Space Watch / research or All products to investigate; no fallback competitors are added.")
     return scope,d
 
@@ -76,9 +77,12 @@ def render_map(st,data,rows,key,compact=False):
     fig=go.Figure()
     fig.add_trace(go.Scatter(x=[100],y=[2],mode="markers+text",text=["AIT-VISTA"],textposition="top center",name="AIT-VISTA reference",customdata=[[VISTA]],marker=reference_marker(),hovertemplate="100% declared scope / target; not market share<extra></extra>"))
     if not d.empty:
-        rivals=px.scatter(d,x="X",y="Display Y",color="Role",color_discrete_map=role_colors(),hover_name="Product",custom_data=["Product ID"],hover_data={"X":":.2f","Display Y":False,"Core evidence coverage":":.1%","Core determinate coverage":":.1%","Customer position":True,"Customer basis":True,"Procurement":True})
+        core=set(strategic_map_cohort(d)["Product ID"])
+        label_all=st.checkbox("Show all company labels",key=key+"-labels")
+        d["Visible label"]=[r.Company if label_all or r["Product ID"] in core else "" for _,r in d.iterrows()]
+        rivals=px.scatter(d,x="X",y="Display Y",color="Role",color_discrete_map=role_colors(),text="Visible label",hover_name="Product",custom_data=["Product ID"],hover_data={"Company":True,"Visible label":False,"X":":.2f","Display Y":False,"Core evidence coverage":":.1%","Core determinate coverage":":.1%","Customer position":True,"Customer basis":True,"Procurement":True})
         for tr in rivals.data:
-            tr.update(marker=rival_marker(tr.name))
+            tr.update(marker=rival_marker(tr.name),textposition="top center",textfont={"size":10,"color":tokens()["text"]},cliponaxis=False)
             fig.add_trace(tr)
     for y in range(4):
         threshold=40 if y>=2 else 60
@@ -95,7 +99,7 @@ def render_map(st,data,rows,key,compact=False):
                 select_product(st,d[(d.X==cell[0])&(d.Y==cell[1])],key+"-cell-product-"+str(cell),"Product in shared category")
         with st.expander("Exact scores and evidence coverage"):
             table(st,d[["Company","Product","Recorded overlap fraction","Core evidence coverage","Core determinate coverage","Customer position"]].assign(**{c:d[c].map(lambda v:f"{v:.2%}") for c in ["Recorded overlap fraction","Core evidence coverage","Core determinate coverage"]}),key+"-score")
-    st.caption("Score = (full + 0.5 × partial) / 8. Recorded evidence coverage = active pairs / 8; determinate coverage = full, partial or explicitly unsupported / 8. 0% is not proof of non-support. Shading marks eligibility, not risk; vertical offsets are display-only. Shared procurement is unresolved.")
+    st.caption("Core company labels are shown by default; use Show all company labels or the exact product selector for dense points. Score = (full + 0.5 × partial) / 8. Recorded evidence coverage = active pairs / 8; determinate coverage = full, partial or explicitly unsupported / 8. 0% is not proof of non-support. Shading marks eligibility, not risk; vertical offsets are display-only. Shared procurement is unresolved.")
 
 def open_profile(st,pid,cid,key):
     st.button("Open profile",key="open-"+key,on_click=navigate,args=(st,pid,cid))
@@ -314,21 +318,22 @@ def positioning(st,data,cfg,rows):
     st.session_state["founder-map-products"]=ids
     render_map(st,data,d,"founder-map")
     st.caption(f"{len(d)} of {len(rows)} product records shown. Hidden products are not assessed as low threat.")
-    if d.empty:return
-    select_product(st,d,"map")
+    if not d.empty:select_product(st,d,"map")
     with st.expander("Map exclusions"):
         excluded=map_exclusions(rows,d,scope)
         if excluded.empty:st.caption("All products included.")
         else:table(st,excluded[["Company","Product","Role","Reason not shown"]],"market-map-exclusions")
     st.subheader("AIT workflow coverage")
+    _,benchmark=choose_cohort(st,rows,"workflow-benchmark-scope","Workflow benchmark scope")
+    workflow_ids=benchmark["Product ID"].tolist()
+    st.session_state["workflow-products"]=workflow_ids
     criteria=registry(data,CRITERIA,"Criterion ID")
     stages={c:label for label,c in WORKFLOW_EXAMPLES if c in criteria}
-    if stages:
-        workflow_ids=ids
-        st.caption("Workflow uses the same selected market cohort.")
-        heatmap(st,data,cfg,d[d["Product ID"].isin(workflow_ids)],"workflow",list(stages),stage_labels=stages)
+    if stages and not benchmark.empty:
+        st.caption("Workflow benchmark is independent of map selection.")
+        heatmap(st,data,cfg,benchmark,"workflow",list(stages),stage_labels=stages)
         st.caption("Selected criterion examples by workflow stage, not proof of complete or integrated stage coverage.")
-    else:
+    elif not stages:
         st.info("Workflow example criteria are absent in this snapshot. Open Advanced Analytics for mapped stage coverage.")
 
 def advantage(st,data,cfg,rows):
@@ -416,15 +421,32 @@ def monitor(st,data,cfg,rows,snapshots,current,demo):
                     table(st,changes,"market-changes",True)
                     select_product(st,rows[rows["Product ID"].isin(changes["Product ID"])],"market-changes")
     st.subheader("Research priorities")
-    if not rows.empty and registry(data,CRITERIA,"Criterion ID"):
-        stamp=next((s[1] for s in snapshots if s[0]==current),"")
-        q=research_queue(data,direct_matrix(data),cfg,stamp)
-        if not q.empty:
-            view=q.copy();view["Product"]=view["Product ID"].map(lambda p:value(pro.get(p,{}),"Product Name"))
-            table(st,view[["Product","Research question","Strategic decision affected","Reason for uncertainty"]].head(15),"research-preview")
-            download_analysis(st,q,"founder-research","priority-research")
-            st.download_button("Export complete research queue CSV",q.to_csv(index=False).encode(),file_name="priority-research.csv",key="founder-research-csv")
-            select_product(st,rows[rows["Product ID"].isin(q.head(15)["Product ID"])],"research")
+    stamp=next((s[1] for s in snapshots if s[0]==current),"")
+    q=priority_queue(data,cfg,("synthetic-"+digest(data)) if demo else current,stamp if not demo else "")
+    st.caption("Complete snapshot, independent of market and benchmark filters. P0 prioritises source-backed product space relevance, not commercial threat.")
+    if q.empty:st.info("No research questions in the derived queue.")
+    else:
+        tiers=st.multiselect("Priority tiers",list(q["Priority tier"].unique()),default=list(q["Priority tier"].unique()),key="research-tiers")
+        view=q[q["Priority tier"].isin(tiers)].reset_index(drop=True)
+        table(st,view[["Priority tier","Company","Product","Criterion ID","Current verdict","Space relevance type","Research question","Reason"]].head(30),"research-preview")
+        st.caption(f"{len(view)} visible questions / {len(q)} in complete queue. Exports contain the complete queue.")
+        download_analysis(st,q,"founder-research","priority-research")
+        st.download_button("Export complete research queue CSV",q.to_csv(index=False).encode(),file_name="priority-research.csv",key="founder-research-csv")
+        if not view.empty:
+            labels={i:r.Product+" | "+(r["Criterion ID"] or "Product relevance")+" | "+r["Current verdict"] for i,r in view.iterrows()}
+            i=st.selectbox("Inspect research question",list(labels),format_func=labels.get,key="space-research-question")
+            r=view.iloc[i]
+            st.write(r["Research question"]);st.caption(r["Evidence IDs"]+" · "+r["Source URLs"])
+            st.button("Open research evidence",key="space-research-open",on_click=navigate,args=(st,r["Product ID"],r["Company ID"],"Competitor Explorer",r["Criterion ID"] or None,"Comparison Assessment" if r["Comparison ID"] else None,r["Comparison ID"] or None))
+        if st.button("Generate complete research queue PDF",key="queue-pdf-generate"):
+            from pdf_reports import render_report
+            mode="SYNTHETIC DEMO" if demo else "LOCAL SNAPSHOT"
+            source=next((s[2] for s in snapshots if s[0]==current),"")
+            st.session_state["queue-pdf"]=(digest(data),render_report(data,cfg,"Intelligence monitor",mode=mode,captured=stamp,snapshot_hash=current,source=source,queue_only=True))
+        saved=st.session_state.get("queue-pdf")
+        if saved and saved[0]==digest(data):
+            st.download_button("Download complete research queue PDF",saved[1],file_name="5PACE_space_priority_queue.pdf",mime="application/pdf",key="queue-pdf-download")
+
 
 def response_view(st,data,cfg,rows,key,cids=None):
     e=exposure(data,cfg,rows["Product ID"].tolist(),cids)
@@ -495,7 +517,7 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     if rows.empty:st.info("No product records yet.");return
     stamp=next((x[1] for x in snapshots if x[0]==current),"Not captured")
     st.caption("Snapshot capture: "+("Synthetic demo (not stored)" if demo else stamp))
-    scope,mapped=choose_cohort(st,rows,"landing-map-scope","Strategic cohort")
+    scope,mapped=choose_cohort(st,rows,"landing-map-scope","Market map scope","All products")
     st.session_state["landing-products"]=mapped["Product ID"].tolist()
     st.subheader("Technology × customer positioning")
     render_map(st,data,mapped,"landing-map",True)
@@ -519,11 +541,13 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
             try:
                 with connect() as conn:prior=read_snapshot(conn,stamps[stamps.index(current)+1])
             except (ValueError,OSError):pass
-    threat_view(st,data,cfg,rows,prior,mapped)
+    st.subheader("Strategic benchmark")
+    _,benchmark=choose_cohort(st,rows,"landing-benchmark-scope","Benchmark scope")
+    threat_view(st,data,cfg,rows,prior,benchmark)
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")
-        items=mapped
+        items=benchmark
         if items.empty:st.caption("No products in the selected strategic cohort.")
         for _,r in items.iterrows():
             with st.container(border=True):
@@ -555,7 +579,7 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         st.button("Intelligence Monitor",on_click=navigate,args=(st,None,None,"Intelligence Monitor"),key="landing-monitor")
     st.caption("Qualitative review order, not a calibrated threat score. Full rationale, source dates and unresolved questions are in each profile.")
     st.subheader("Where we may differentiate")
-    candidates=mapped["Product ID"].tolist()
+    candidates=benchmark["Product ID"].tolist()
     if candidates and registry(data,CRITERIA,"Criterion ID"):
         d=advantage_summary(data,cfg,candidates)
         if not d.empty:

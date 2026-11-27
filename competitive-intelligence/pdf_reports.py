@@ -19,6 +19,7 @@ from command_engine import registry,direct_matrix,direct_current,matrix_audit,re
 from product_intelligence import CRITERIA
 from founder import DEFAULT_MAP_SCOPE,summaries,strategic_map_cohort,brief_criteria,profile_records,advantage_summary,profile_findings,WORKFLOW_EXAMPLES
 from decision import signals,CUSTOMER_LANES,FUNCTION_LANES,importance_lane
+from space_research import priority_queue
 from threat_watch import exposure,report_provenance,selected_criteria,spread_points,exposure_records,priority_records
 
 REPORTS=["Strategic overview","Competitor profile","Market positioning & workflow","Competitive advantage","Intelligence monitor","QA & data integrity","Combined strategic report"]
@@ -47,7 +48,7 @@ def cohort_signals(data,ids,company_ids):
     sig=signals(data)
     return sig[sig["Product ID"].isin(ids)|((sig["Product ID"]=="")&sig["Company ID"].isin(company_ids))]
 
-def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None):
+def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured="",snapshot_hash="",source="",criterion_ids=None,map_scope=None,map_product_ids=None,queue_only=False):
     if kind not in REPORTS:raise ValueError("Unknown report type")
     captured,snapshot_hash,source=report_provenance(data,mode,captured,snapshot_hash,source)
     fonts()
@@ -60,7 +61,11 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     d=rows[rows["Product ID"].isin(chosen)] if not rows.empty else rows
     ids=d["Product ID"].tolist() if not d.empty else []
     cids=selected_criteria(data) if criterion_ids is None else [c for c in criterion_ids if c in criteria]
-    map_scope=map_scope or (DEFAULT_MAP_SCOPE if product_ids is None else "Explicit product selection")
+    benchmark_scope=map_scope or (DEFAULT_MAP_SCOPE if product_ids is None else "Explicit product selection")
+    map_scope="All products" if map_product_ids is None else "Explicit map selection"
+    map_ids=list(products) if map_product_ids is None else list(dict.fromkeys(p for p in map_product_ids if p in products))
+    md=rows[rows["Product ID"].isin(map_ids)] if not rows.empty else rows
+    map_ids=md["Product ID"].tolist() if not md.empty else []
     buf=BytesIO();doc=SimpleDocTemplate(buf,pagesize=A4,rightMargin=39,leftMargin=39,topMargin=48,bottomMargin=43,title="5PACE | "+kind,author="5PACE")
     width=A4[0]-78
     styles={
@@ -134,24 +139,25 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         rx=left+cw;ry=bottom+2.5*ch
         dr.add(Circle(rx,ry,17,fillColor=colors.HexColor("#D9EEEA"),strokeColor=TEAL,strokeWidth=1.2))
         dr.add(String(rx,ry+19,"AIT-VISTA",fontName=BOLD,fontSize=7,textAnchor="end",fillColor=TEAL))
-        if not d.empty:
-            for (x,y),g in d.groupby(["Recorded overlap fraction","Customer position"]):
+        if not md.empty:
+            for (x,y),g in md.groupby(["Recorded overlap fraction","Customer position"]):
                 if y not in CUSTOMER_LANES:continue
                 xx=left+x*cw;yy=bottom+(CUSTOMER_LANES.index(y)+.5)*ch
                 if x==1 and y==CUSTOMER_LANES[2]:yy-=10
                 dr.add(Circle(xx,yy,6,fillColor=colors.HexColor("#466D8A"),strokeColor=colors.white,strokeWidth=.8))
-                label=str(len(g))+"×" if len(g)>1 else str(ids.index(g.iloc[0]["Product ID"])+1)
+                label=str(len(g))+"×" if len(g)>1 else str(map_ids.index(g.iloc[0]["Product ID"])+1)
                 dr.add(String(xx,yy-2,label,fontName=BOLD,fontSize=6,textAnchor="middle",fillColor=colors.white))
         story.append(dr)
         add("Shading denotes the default eligibility rule. Dense cells show group size; exact product values are listed below. Horizontal positions are not jittered.","small")
-        table(["# / product","Overlap / coverage","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,f'{r["Recorded overlap fraction"]:.2%} overlap; {r["Core evidence coverage"]:.2%} recorded; {r["Core determinate coverage"]:.2%} determinate',r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(d.iterrows())],[1.1,1,2.2])
+        table(["# / product","Overlap / coverage","Customer position / evidence"],[(str(i+1)+". "+r.Company+" / "+r.Product,f'{r["Recorded overlap fraction"]:.2%} overlap; {r["Core evidence coverage"]:.2%} recorded; {r["Core determinate coverage"]:.2%} determinate',r["Customer position"]+"\n"+r["Customer basis"]) for i,(_,r) in enumerate(md.iterrows())],[1.1,1,2.2])
         heading("Map scope and exclusions")
-        add(map_scope+" — "+str(len(ids))+" of "+str(len(rows))+" products. Default uses the unrounded 40% / 60% rule; no family or role restriction.")
+        add(map_scope+" — "+str(len(map_ids))+" of "+str(len(rows))+" products. Map is independent of the benchmark; shaded regions show the strategic core thresholds.")
         from founder import map_exclusions
-        excluded=map_exclusions(rows,d,map_scope)
+        excluded=map_exclusions(rows,md,map_scope)
         if not excluded.empty:table(["Product","Reason not shown"],[(r.Product,r["Reason not shown"]) for _,r in excluded.iterrows()],[1,2])
         else:add("All products included.")
         heading("AIT workflow criterion examples")
+        add("Benchmark scope: "+benchmark_scope+" — "+str(len(ids))+" products.")
         stage={c:l for l,c in WORKFLOW_EXAMPLES if c in criteria}
         matrix_table(list(stage),stage)
         add("Individual criteria are examples, not evidence of full workflow integration.")
@@ -196,10 +202,12 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
         sig=cohort_signals(data,ids,d["Company ID"].tolist() if not d.empty else [])
         add("Most recent 30 recorded signals. Event dates, commercial applicable dates and research discovery dates are distinct.")
         table(["Date / type","Company / development","Decision, limitations and source"],[(r.Date+"\n"+r["Date basis"],value(companies.get(r["Company ID"],{}),"Company Name")+"\n"+r.Development,r["Strategic implication"]+"\n"+r.Limitations+"\n"+r.Reference+"\n"+r.Source) for _,r in sig.head(30).iterrows()],[1,2,2])
-        if ids and criteria:
-            q=research_queue(data,direct_matrix(data,ids),cfg,captured)
-            add("Top 20 research questions in report cohort","sub")
-            table(["Product / priority","Research question","Decision / evidence IDs"],[(value(products.get(r["Product ID"],{}),"Product Name")+"\n"+text(r.Priority),r["Research question"],r["Strategic decision affected"]+"\n"+r["Existing evidence IDs"]+"\n"+r["Reason for uncertainty"]) for _,r in q.head(20).iterrows()],[1,2,2])
+        queue_section(False)
+    def queue_section(full):
+        q=priority_queue(data,cfg,snapshot_hash,captured)
+        heading("Space-priority research queue")
+        add("Complete snapshot scope: "+str(len(products))+" products; "+str(len(q))+" research questions. Independent of map and benchmark. "+("Complete queue." if full else "First 20 questions; full CSV/PDF available in Intelligence Monitor."))
+        table(["Product / criterion / priority","Research question / reason","Evidence / space relevance"],[(r.Company+" / "+r.Product+"\n"+r["Product ID"]+" | "+r["Criterion ID"]+"\n"+r["Priority tier"]+"\n"+f'{r["Recorded overlap"]:.2%} overlap / {r["Evidence coverage"]:.2%} coverage',r["Research question"]+"\n"+r["Current verdict"]+" | "+r["Evidence level"]+"\n"+r.Reason,r["Space relevance type"]+"\n"+r["Evidence IDs"]+"\n"+r["Source URLs"]) for _,r in (q if full else q.head(20)).iterrows()],[1.5,2,2])
     def qa():
         heading("Snapshot data quality")
         errors,warnings=validate(data);mismatches=matrix_audit(data)
@@ -212,13 +220,14 @@ def render_report(data,cfg,kind,product_ids=None,mode="LOCAL SNAPSHOT",captured=
     add("Captured UTC: "+(captured or "Not recorded")+" | Source: "+(source or "Not recorded"))
     add("Snapshot: "+(snapshot_hash or digest(data)),"small")
     add("Generated UTC: "+datetime.now(timezone.utc).isoformat(timespec="seconds"),"small")
-    add("Report cohort: "+str(len(ids))+" products; Threat Watch criteria: "+str(len(cids))+". AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
-    if not ids:add("No qualifying products in this scope. Use Space Watch / research or All products; no fallback was applied.")
+    add("Map scope: "+map_scope+" ("+str(len(map_ids))+" products). Benchmark scope: "+benchmark_scope+" ("+str(len(ids))+" products). Research queue scope: complete snapshot ("+str(len(products))+" products). Threat Watch criteria: "+str(len(cids))+". AIT-VISTA: As-Is, owner-declared functionality. All findings are conditional on recorded evidence and report scope.")
+    if not ids:add("No qualifying benchmark products in this scope. Use Space Watch / research or All products; no fallback was applied.")
     def overview_with_threat():
         overview()
         threat()
     funcs={"Strategic overview":overview_with_threat,"Competitor profile":profile_report,"Market positioning & workflow":market,"Competitive advantage":advantage,"Intelligence monitor":monitor,"QA & data integrity":qa}
-    if kind=="Combined strategic report":
+    if queue_only:queue_section(True)
+    elif kind=="Combined strategic report":
         for i,fn in enumerate([overview_with_threat,market,advantage,monitor,qa]):
             if i:story.append(PageBreak())
             fn()

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8-rc1 — Scope separation and Space Priority
+
+- All-products maps and independent strategic benchmark controls, with explicit core labels.
+- Complete-snapshot P0/P1/P2 derived queue and local CSV/PDF exports.
+- Independent report scopes; unchanged overlap methodology and source governance.
+
 ## 1.4.7-rc1 — Unified 40% / 60% strategic cohort
 
 - Fixed eight-criterion recorded-overlap score and inclusive customer-evidence thresholds.

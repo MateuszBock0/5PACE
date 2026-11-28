@@ -530,13 +530,6 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
         else:
             table(st,excluded[["Company","Product","Role","Reason not shown"]],"map-exclusions")
             select_product(st,excluded,"excluded-map")
-    portfolio_view(st,data,rows,navigate,table)
-    watch=strategic_map_cohort(rows,SPACE_WATCH)
-    with st.expander("Separate Space Watch / research — outside strategic core"):
-        if watch.empty:st.caption("No additional space/research products.")
-        else:
-            table(st,watch[["Company","Product","Customer position","Recorded overlap fraction"]].assign(**{"Recorded overlap fraction":watch["Recorded overlap fraction"].map(lambda v:f"{v:.2%}")}),"space-watch")
-            select_product(st,watch,"space-watch")
     prior=None
     if not demo:
         stamps=[s[0] for s in snapshots]
@@ -547,6 +540,13 @@ def landing(st,data,cfg,rows,snapshots,current,demo):
     st.subheader("Strategic benchmark")
     _,benchmark=choose_cohort(st,rows,"landing-benchmark-scope","Benchmark scope")
     threat_view(st,data,cfg,rows,prior,benchmark)
+    portfolio_view(st,data,rows,navigate,table)
+    watch=strategic_map_cohort(rows,SPACE_WATCH)
+    with st.expander("Separate Space Watch / research — outside strategic core"):
+        if watch.empty:st.caption("No additional space/research products.")
+        else:
+            table(st,watch[["Company","Product","Customer position","Recorded overlap fraction"]].assign(**{"Recorded overlap fraction":watch["Recorded overlap fraction"].map(lambda v:f"{v:.2%}")}),"space-watch")
+            select_product(st,watch,"space-watch")
     left,right=st.columns([1.6,1])
     with left:
         st.subheader("Why watch these companies?")

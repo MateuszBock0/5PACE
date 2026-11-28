@@ -26,6 +26,8 @@ def test_founder_navigation(monkeypatch,tmp_path):
     app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py"),default_timeout=45).run()
     assert not app.exception
     assert app.sidebar.radio[0].value=="Command Centre"
+    headings=[x.value for x in app.subheader]
+    assert headings.index("Technology × customer positioning") < headings.index("Strategic benchmark") < headings.index("Threat Watch") < headings.index("Company Portfolio Coverage")
     from founder import DEFAULT_MAP_SCOPE
     assert app.selectbox(key="landing-map-scope").value=="All products"
     assert set(app.session_state["landing-products"])=={"DEMO-P1","DEMO-P2"}

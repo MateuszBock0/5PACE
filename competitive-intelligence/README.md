@@ -189,3 +189,6 @@ Independent primary workspace over the complete local snapshot. Company inclusio
 
 ## v1.5.1-rc1 — Space knowledge gaps
 Separate Company Watchlist tab, evaluated against the entire snapshot independently of the general watchlist thresholds. Space-linked companies with no registered or specifically space-linked product always qualify for product discovery; mapped space products qualify with at least three distinct core criteria requiring technical evidence by default (adjustable). Zero recorded overlap is not exclusion. Coverage is N/A without a mapped product. Counts refer only to mapped space product/criterion pairs; no company-to-product inheritance. Sources, exact criterion navigation and local Excel/CSV exports. No Sheets, schema, sync or automation changes.
+
+## v1.5.2-rc1 — Command Centre section order
+The complete Strategic benchmark / Threat Watch section follows the technology × customer map and precedes Company Portfolio Coverage. Independent scope controls, scoring and evidence drill-down are unchanged.

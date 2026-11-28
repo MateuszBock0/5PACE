@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2-rc1 — Command Centre section order
+
+- Move the complete Strategic benchmark / Threat Watch block above Company Portfolio Coverage; retain independent scope and evidence controls.
+
 ## 1.5.1-rc1 — Space knowledge gaps
 
 - Dedicated Space — Knowledge Gaps tab in Company Watchlist, independent of overlap and existing watchlist filters.

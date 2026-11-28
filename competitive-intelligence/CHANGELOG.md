@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1-rc1 — Space knowledge gaps
+
+- Dedicated Space — Knowledge Gaps tab in Company Watchlist, independent of overlap and existing watchlist filters.
+- Product discovery for space-linked companies without mapped products; technical evidence gaps, exact sources, and local Excel/CSV export for mapped products.
+
 ## 1.5.0-rc1 — Company Watchlist
 
 - Independent company-level watchlist with configurable 20% overlap and three-gap default thresholds, source-backed space signals, and separate weak-claim / unresolved counts.

@@ -58,6 +58,11 @@ def test_founder_navigation(monkeypatch,tmp_path):
         if page=="Company Watchlist":
             assert app.slider(key="watch-threshold").value==20
             assert app.slider(key="watch-min-gaps").value==3
+            assert app.slider(key="space-gaps-min").value==3
+            assert "Space — Knowledge Gaps" in [tab.label for tab in app.tabs]
+            app.slider(key="space-gaps-min").set_value(6).run()
+            assert app.slider(key="watch-min-gaps").value==3
+            assert not app.exception
             app.slider(key="watch-threshold").set_value(40).run()
             app.button(key="watch-reset").click().run()
             assert app.slider(key="watch-threshold").value==20

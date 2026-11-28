@@ -4,6 +4,7 @@ from company_watchlist import watchlist, watchlist_changes
 from core import connect,read_snapshot,digest
 from excel_archive import download_analysis
 from portfolio_ui import source_links
+from space_gaps_ui import space_gaps_view
 
 PERCENT=["Best Product Overlap","Portfolio Overlap","Commercial-only overlap","Evidence Completeness","Determinate completeness"]
 def reset(st):
@@ -15,6 +16,13 @@ def reset(st):
 
 def watchlist_view(st,data,cfg,snapshots,current,demo,navigate,table):
     st.header("Company Watchlist")
+    general,space=st.tabs(["All watchlist companies","Space — Knowledge Gaps"])
+    with general:
+        general_watchlist_view(st,data,cfg,snapshots,current,demo,navigate,table)
+    with space:
+        space_gaps_view(st,data,snapshots,current,demo,navigate,table)
+
+def general_watchlist_view(st,data,cfg,snapshots,current,demo,navigate,table):
     st.caption("Research priority, not threat probability. Full snapshot, independent of strategic core (40/60). Company-level space activity does not establish product-level adoption.")
     a,b=st.columns(2)
     threshold=a.slider("Technology overlap threshold (%)",0,100,20,5,key="watch-threshold")/100
